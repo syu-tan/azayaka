@@ -1,0 +1,12 @@
+# cache
+__pycache__/
+*.pyc
+
+# pypi packages
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# virtual environments
+requirements.yaml

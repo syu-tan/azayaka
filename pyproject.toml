@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azayaka"
+version = "0.1.0"
+description = "SAR/InSAR processing utilities with geometry calculations for JAXA CEOS and SICD formats."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+  {name = "yasui syusuke", email = "syuchimu@gmail.com"},
+  {name = "yamamoto yutaka", email = "syuchimu@gmail.com"},
+]
+keywords = ["SAR", "InSAR", "CEOS", "SICD", "remote-sensing", "radar"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
