@@ -6,8 +6,17 @@ and QGIS plugin SAR tools. It focuses on geometry calculations for JAXA CEOS and
 
 ## Installation
 
+From PyPI:
 ```bash
 pip install azayaka
+```
+
+From source:
+```bash
+git clone https://github.com/<your-org-or-user>/azayaka.git
+cd azayaka
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Requirements
