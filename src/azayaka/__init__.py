@@ -1,4 +1,15 @@
-"""azayaka: SAR/InSAR geometry utilities."""
+# -*- coding: utf-8 -*-
+"""
+Azayaka: 
+    SAR/InSAR Python Package.
+    It includes various utilities for SAR/InSAR data processing and analysis.
+    
+    QGIS Plugin "Azayaka" is also provided for easy access to some functionalities.
+
+    Copyright (c) 2026 Syusuke Yasui, Yutaka Yamamoto, and contributors.
+    Licensed under the APGL-3.0 License.
+
+"""
 
 __all__ = ["__version__"]
 
