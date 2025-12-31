@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = {file = "LICENSE"}
 authors = [
   {name = "yasui syusuke", email = "syuchimu@gmail.com"},
-  {name = "yamamoto yutaka", email = "syuchimu@gmail.com"},
+  {name = "yamamoto yutaka", email = "yamamo10yu1995@gmail.com"},
 ]
 keywords = ["SAR", "InSAR", "CEOS", "SICD", "remote-sensing", "radar"]
 classifiers = [
@@ -23,6 +23,14 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: GIS",
   "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+  "matplotlib",
+  "numpy",
+  "opencv-python",
+  "rasterio",
+  "scipy",
+  "tqdm",
 ]
 
 [tool.setuptools.packages.find]
