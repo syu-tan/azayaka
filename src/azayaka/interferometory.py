@@ -114,12 +114,18 @@ class Interferometry:
         return sign
 
     @staticmethod
-    def _coherence_vectorized(clx_m: np.ndarray, clx_s: np.ndarray, window_size: int) -> np.ndarray:
+    def _coherence_vectorized(
+        clx_m: np.ndarray,
+        clx_s: np.ndarray,
+        window_size: int,
+        mean_m_squared: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
         ifg = clx_m * np.conj(clx_s)
         mean_ifg = uniform_filter(ifg.real, size=window_size, mode="constant") + 1j * uniform_filter(
             ifg.imag, size=window_size, mode="constant"
         )
-        mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
+        if mean_m_squared is None:
+            mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
         mean_s_squared = uniform_filter(np.abs(clx_s) ** 2, size=window_size, mode="constant")
         denominator = np.sqrt(mean_m_squared * mean_s_squared)
 
@@ -148,11 +154,13 @@ class Interferometry:
         h_shift_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
         w_shift_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
         coh_best_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
+        clx_s_shifted = np.zeros_like(clx_s)
+        mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
 
         with tqdm(total=len(shifts) ** 2, desc="Computing coherence shifts") as pbar:
             for h_shift in shifts:
                 for w_shift in shifts:
-                    clx_s_shifted = np.zeros_like(clx_s)
+                    clx_s_shifted.fill(0)
                     src_h_start = max(0, -h_shift)
                     src_h_end = min(height, height - h_shift)
                     src_w_start = max(0, -w_shift)
@@ -167,13 +175,18 @@ class Interferometry:
                         src_h_start:src_h_end, src_w_start:src_w_end
                     ]
 
-                    coherence_map = cls._coherence_vectorized(clx_m, clx_s_shifted, window_size)
-                    for i, h_idx in enumerate(h_points):
-                        for j, w_idx in enumerate(w_points):
-                            if coherence_map[h_idx, w_idx] > coh_best_sparse[i, j]:
-                                coh_best_sparse[i, j] = coherence_map[h_idx, w_idx]
-                                h_shift_sparse[i, j] = h_shift
-                                w_shift_sparse[i, j] = w_shift
+                    coherence_map = cls._coherence_vectorized(
+                        clx_m,
+                        clx_s_shifted,
+                        window_size,
+                        mean_m_squared=mean_m_squared,
+                    )
+                    coherence_points = coherence_map[np.ix_(h_points, w_points)]
+                    update_mask = coherence_points > coh_best_sparse
+                    if np.any(update_mask):
+                        coh_best_sparse[update_mask] = coherence_points[update_mask]
+                        h_shift_sparse[update_mask] = h_shift
+                        w_shift_sparse[update_mask] = w_shift
                     pbar.update(1)
 
         h_interp = RectBivariateSpline(h_points, w_points, h_shift_sparse, kx=1, ky=1)
@@ -604,6 +617,7 @@ class Interferometry:
         dem_coreg_window_size: int = 128,
         dem_coreg_shift_range: int = 1,
         dem_coreg_stride: int = 2,
+        sub_buffer: int = 1000
     ) -> Dict[str, str]:
         geocoder = geocode.Geocode(
             self.main,
@@ -631,7 +645,6 @@ class Interferometry:
         main_crop = self.main.signal[top_az:bot_az, left_rg:right_rg]
         intensity_crop = np.abs(main_crop).astype(np.float32)
 
-        sub_buffer = 2000
         sub_top = max(top_az - sub_buffer, 0)
         sub_bot = min(bot_az + sub_buffer, self.sub.signal.shape[0])
         sub_left = max(left_rg - sub_buffer, 0)
