@@ -10,3 +10,7 @@ build/
 
 # virtual environments
 requirements.yaml
+
+# outputs
+output/
+logs/

@@ -37,6 +37,61 @@ from tqdm import tqdm
 
 # comment JP -> ENG
 
+
+def _write_observation_json(obj, output_path: str):
+    def _to_list(value):
+        if value is None:
+            return None
+        return value.tolist()
+
+    time_start = getattr(obj, "TIME_OBS_START_SEC", None)
+    time_end = getattr(obj, "TIME_OBS_END_SEC", None)
+    duration = None
+    if time_start is not None and time_end is not None:
+        duration = float(time_end - time_start)
+
+    slant_range = getattr(obj, "SLANT_RANGE_SAMPLE", None)
+    if slant_range is not None:
+        near_range = float(np.min(slant_range))
+        far_range = float(np.max(slant_range))
+        range_sample_spacing = float(getattr(obj, "DIS_RANGE_SLANT", slant_range[1] - slant_range[0]))
+    else:
+        near_range = None
+        far_range = None
+        range_sample_spacing = None
+
+    height_sat = getattr(obj, "HEIGHT_SAT", None)
+    mean_height = float(np.mean(height_sat)) if height_sat is not None else None
+
+    scene_id = os.path.basename(getattr(obj, "PATH_CEOS_FOLDER", "")) or None
+
+    data = {
+        "format": obj.__class__.__name__,
+        "scene_id": scene_id,
+        "observation": {
+            "start_sec": None if time_start is None else float(time_start),
+            "end_sec": None if time_end is None else float(time_end),
+            "duration_sec": duration,
+        },
+        "orbit": {
+            "P_X_SAT": _to_list(getattr(obj, "P_X_SAT", None)),
+            "P_Y_SAT": _to_list(getattr(obj, "P_Y_SAT", None)),
+            "P_Z_SAT": _to_list(getattr(obj, "P_Z_SAT", None)),
+            "V_X_SAT": _to_list(getattr(obj, "V_X_SAT", None)),
+            "V_Y_SAT": _to_list(getattr(obj, "V_Y_SAT", None)),
+            "V_Z_SAT": _to_list(getattr(obj, "V_Z_SAT", None)),
+        },
+        "range": {
+            "near_range_m": near_range,
+            "far_range_m": far_range,
+            "range_sample_spacing_m": range_sample_spacing,
+        },
+        "mean_sat_height_m": mean_height,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=True, indent=2)
+
 class CEOS_PALSAR_L10_RAW(object):
     """ CEOS Format Reader """
     
@@ -590,14 +645,11 @@ class CEOS_PALSAR_L10_RAW(object):
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
         
-    def set_aperture_sample_scale(self, aperture_sample_scale=1):
-        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD // aperture_sample_scale
-        print('アパーチャサンプル数を設定:', self.NUM_APERTURE_SAMPLE)
-        
-    def set_geometory(self, plot=False):
+    def set_geometory(self, plot=False, output_json_path: str = None):
         """ 観測ジオメトリの設定 """
         
         self.TIME_SHIFT = 0.0  # [sec] 時刻シフト量
+        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # アパーチャサンプル数の設定
         
         # # 軌道情報
         # 時間
@@ -686,6 +738,8 @@ class CEOS_PALSAR_L10_RAW(object):
         self.HEIGHT_SAT = self.P_SAT - self.P_EARTH_RADIUS
         # .  self.P_EARTH_RADIU = re2 -> re_c 変数
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
+        if output_json_path:
+            _write_observation_json(self, output_json_path)
 
 
 import os
@@ -1426,15 +1480,11 @@ class CEOS_PALSAR_L11_SLC(object):
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
 
-    # L1.0 と同じインターフェース
-    def set_aperture_sample_scale(self, aperture_sample_scale=1):
-        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD // aperture_sample_scale
-        print("アパーチャサンプル数を設定:", self.NUM_APERTURE_SAMPLE)
-
-    def set_geometory(self, plot=False):
+    def set_geometory(self, plot=False, output_json_path: str = None):
         """観測ジオメトリの設定（L1.0 用実装と同じ変数名で動作）"""
 
         self.TIME_SHIFT = 0.0  # [sec]
+        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # フルサンプル
 
         # 軌道情報の時刻配列
         self.time_orbit = np.arange(
@@ -1565,6 +1615,8 @@ class CEOS_PALSAR_L11_SLC(object):
         )
         self.HEIGHT_SAT = self.P_SAT - self.P_EARTH_RADIUS
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
+        if output_json_path:
+            _write_observation_json(self, output_json_path)
 
 
 class CEOS_PALSAR2_L11_SLC(object):
@@ -2239,26 +2291,9 @@ class CEOS_PALSAR2_L11_SLC(object):
         print("共通パラメータの設定完了\n")
 
     # --------------------------------------------------------------
-    # アパーチャサンプル数の変更 (ダウンサンプリング用)
-    # --------------------------------------------------------------
-    def set_aperture_sample_scale(self, aperture_sample_scale: int=1):
-        """
-        アパーチャ方向のサンプル数を間引くためのスケール指定
-
-        Args:
-            aperture_sample_scale (int): 1,2,4,... のような整数。
-                2 を指定するとアジマス方向サンプル数が 1/2 になる。
-        """
-        if aperture_sample_scale < 1:
-            raise ValueError("aperture_sample_scale は 1 以上の整数にしてください")
-
-        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD // aperture_sample_scale
-        print("アパーチャサンプル数を設定:", self.NUM_APERTURE_SAMPLE)
-
-    # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-2 PALSAR-2 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str = None):
         """
         観測ジオメトリの設定
 
@@ -2267,7 +2302,8 @@ class CEOS_PALSAR2_L11_SLC(object):
         などを計算する（ALOS-2 PALSAR-2 仕様に対応）。
         """
 
-        self.TIME_SHIFT = 0.0  # [sec]
+        self.TIME_SHIFT = 0.  # [sec]
+        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full azimuth
 
         # 軌道情報の時刻配列
         self.time_orbit = np.arange(
@@ -2294,10 +2330,10 @@ class CEOS_PALSAR2_L11_SLC(object):
             self.TIME_OBS_START_MSEC / self.DIGIT4 + self.TIME_SHIFT
         ) / self.TIME_DAY_SEC
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
-            self.NUM_APERTURE_SAMPLE * 0.0
+            self.NUM_APERTURE_SAMPLE * 0.
         ) / self.FREQ_PULSE_REPETATION
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
-            self.NUM_APERTURE_SAMPLE * 1.0
+            self.NUM_APERTURE_SAMPLE * 1.
         ) / self.FREQ_PULSE_REPETATION
 
         print("観測開始時刻 (秒):", self.TIME_OBS_START_SEC)
@@ -2396,6 +2432,10 @@ class CEOS_PALSAR2_L11_SLC(object):
         )
         self.HEIGHT_SAT = self.P_SAT - self.P_EARTH_RADIUS
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
+        if output_json_path:
+            _write_observation_json(self, output_json_path)
+            
+        return self
 
 
 class CEOS_PALSAR3_L11_SLC(object):
@@ -3153,27 +3193,11 @@ class CEOS_PALSAR3_L11_SLC(object):
 
         print("共通パラメータの設定完了\n")
 
-    # --------------------------------------------------------------
-    # アパーチャサンプル数の変更 (ダウンサンプリング用)
-    # --------------------------------------------------------------
-    def set_aperture_sample_scale(self, aperture_sample_scale: int=1):
-        """
-        アパーチャ方向のサンプル数を間引くためのスケール指定
-
-        Args:
-            aperture_sample_scale (int): 1,2,4,... のような整数。
-                2 を指定するとアジマス方向サンプル数が 1/2 になる。
-        """
-        if aperture_sample_scale < 1:
-            raise ValueError("aperture_sample_scale は 1 以上の整数にしてください")
-
-        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD // aperture_sample_scale
-        print("アパーチャサンプル数を設定:", self.NUM_APERTURE_SAMPLE)
 
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-4 PALSAR-3 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str = None):
         """
         観測ジオメトリの設定
 
@@ -3183,6 +3207,7 @@ class CEOS_PALSAR3_L11_SLC(object):
         """
 
         self.TIME_SHIFT = 0.0  # [sec]
+        self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full azimuth
 
         # 軌道情報の時刻配列
         self.time_orbit = np.arange(
@@ -3303,4 +3328,5 @@ class CEOS_PALSAR3_L11_SLC(object):
         )
         self.HEIGHT_SAT = self.P_SAT - self.P_EARTH_RADIUS
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
-
+        if output_json_path:
+            _write_observation_json(self, output_json_path)
