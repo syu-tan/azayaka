@@ -307,34 +307,39 @@ class Geocode(object):
 
         idx_azimuth = np.zeros((self.dem_height, self.dem_width), dtype=np.int32)
         idx_range = np.zeros((self.dem_height, self.dem_width), dtype=np.int32)
+        sat_pos = np.stack((self.sar.P_X_SAT, self.sar.P_Y_SAT, self.sar.P_Z_SAT), axis=1)
+        sat_vel = np.stack((self.sar.V_X_SAT, self.sar.V_Y_SAT, self.sar.V_Z_SAT), axis=1)
+        sat_vel_t = sat_vel.T
+        sat_pos_dot_vel = np.sum(sat_pos * sat_vel, axis=1)
+        slant_range = self.sar.SLANT_RANGE_SAMPLE
+        slant_sorted = np.all(np.diff(slant_range) > 0)
 
-        for idx_lat, dem_xyz_lat in tqdm(
-            enumerate(xyz_dem),
+        for idx_lat in tqdm(
+            range(self.dem_height),
             desc="DEM Processing Zero Doppler Search Step...",
             total=self.dem_height,
         ):
-            vec_sat_to_dem_x = dem_xyz_lat[:, 0, None] - self.sar.P_X_SAT[None, :]
-            vec_sat_to_dem_y = dem_xyz_lat[:, 1, None] - self.sar.P_Y_SAT[None, :]
-            vec_sat_to_dem_z = dem_xyz_lat[:, 2, None] - self.sar.P_Z_SAT[None, :]
-
-            dot_product = (
-                vec_sat_to_dem_x * self.sar.V_X_SAT
-                + vec_sat_to_dem_y * self.sar.V_Y_SAT
-                + vec_sat_to_dem_z * self.sar.V_Z_SAT
-            )
+            dem_xyz_lat = xyz_dem[idx_lat]
+            dot_product = dem_xyz_lat @ sat_vel_t - sat_pos_dot_vel[None, :]
             idx_closest = np.argmin(np.abs(dot_product), axis=1)
             idx_azimuth[idx_lat, :] = idx_closest
 
-            dis_earth_satellite = np.sqrt(
-                (vec_sat_to_dem_x[np.arange(self.dem_width), idx_closest]) ** 2
-                + (vec_sat_to_dem_y[np.arange(self.dem_width), idx_closest]) ** 2
-                + (vec_sat_to_dem_z[np.arange(self.dem_width), idx_closest]) ** 2
-            )
+            sat_pos_closest = sat_pos[idx_closest]
+            diff = dem_xyz_lat - sat_pos_closest
+            dis_earth_satellite = np.sqrt(np.sum(diff * diff, axis=1))
 
-            idx_slant_range = np.argmin(
-                np.abs(self.sar.SLANT_RANGE_SAMPLE[None, :] - dis_earth_satellite[:, None]),
-                axis=1,
-            )
+            if slant_sorted:
+                idx_slant_range = np.searchsorted(slant_range, dis_earth_satellite, side="left")
+                idx_slant_range = np.clip(idx_slant_range, 1, slant_range.size - 1)
+                left = slant_range[idx_slant_range - 1]
+                right = slant_range[idx_slant_range]
+                use_left = dis_earth_satellite - left <= right - dis_earth_satellite
+                idx_slant_range = np.where(use_left, idx_slant_range - 1, idx_slant_range)
+            else:
+                idx_slant_range = np.argmin(
+                    np.abs(slant_range[None, :] - dis_earth_satellite[:, None]),
+                    axis=1,
+                )
             idx_range[idx_lat, :] = idx_slant_range
 
         idx_invalid_azimuth = (idx_azimuth == 0) | (idx_azimuth == self.sar.NUM_APERTURE_SAMPLE - 1)
@@ -574,10 +579,11 @@ class Geocode(object):
         return dem_radar_smooth, valid_mask
 
     @staticmethod
-    def _correlation_vectorized(clx_m, clx_s, window_size):
+    def _correlation_vectorized(clx_m, clx_s, window_size, mean_m_squared=None):
         ifg = clx_m * clx_s
         mean_ifg = uniform_filter(ifg, size=window_size, mode="constant")
-        mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
+        if mean_m_squared is None:
+            mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
         mean_s_squared = uniform_filter(np.abs(clx_s) ** 2, size=window_size, mode="constant")
         denominator = np.sqrt(mean_m_squared * mean_s_squared)
 
@@ -606,11 +612,13 @@ class Geocode(object):
         h_shift_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
         w_shift_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
         coh_best_sparse = np.zeros((len(h_points), len(w_points)), dtype=np.float32)
+        clx_s_shifted = np.zeros_like(clx_s)
+        mean_m_squared = uniform_filter(np.abs(clx_m) ** 2, size=window_size, mode="constant")
 
         with tqdm(total=len(shifts) ** 2, desc="Computing for shifts") as pbar:
             for h_shift in shifts:
                 for w_shift in shifts:
-                    clx_s_shifted = np.zeros_like(clx_s)
+                    clx_s_shifted.fill(0)
                     src_h_start = max(0, -h_shift)
                     src_h_end = min(height, height - h_shift)
                     src_w_start = max(0, -w_shift)
@@ -625,14 +633,15 @@ class Geocode(object):
                         src_h_start:src_h_end, src_w_start:src_w_end
                     ]
 
-                    correlation_map = cls._correlation_vectorized(clx_m, clx_s_shifted, window_size)
-
-                    for i, h_idx in enumerate(h_points):
-                        for j, w_idx in enumerate(w_points):
-                            if correlation_map[h_idx, w_idx] > coh_best_sparse[i, j]:
-                                coh_best_sparse[i, j] = correlation_map[h_idx, w_idx]
-                                h_shift_sparse[i, j] = h_shift
-                                w_shift_sparse[i, j] = w_shift
+                    correlation_map = cls._correlation_vectorized(
+                        clx_m, clx_s_shifted, window_size, mean_m_squared=mean_m_squared
+                    )
+                    correlation_points = correlation_map[np.ix_(h_points, w_points)]
+                    update_mask = correlation_points > coh_best_sparse
+                    if np.any(update_mask):
+                        coh_best_sparse[update_mask] = correlation_points[update_mask]
+                        h_shift_sparse[update_mask] = h_shift
+                        w_shift_sparse[update_mask] = w_shift
 
                     pbar.update(1)
 
