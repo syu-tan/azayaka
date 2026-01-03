@@ -15,6 +15,7 @@ from typing import Dict, Tuple, Optional
 import numpy as np
 import cv2
 import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from scipy.ndimage import shift, uniform_filter
 from scipy.interpolate import RectBivariateSpline
@@ -44,8 +45,8 @@ class Interferometry:
             min(main_shape[1], sub_shape[1]),
         )
         # Crop to the common area to avoid allocating padded arrays.
-        self.main.signal = self.main.signal[: target_shape[0], : target_shape[1]]
-        self.sub.signal = self.sub.signal[: target_shape[0], : target_shape[1]]
+        self.main.signal = self.main.signal[: target_shape[0],: target_shape[1]]
+        self.sub.signal = self.sub.signal[: target_shape[0],: target_shape[1]]
         print(f"Aligned main/sub signals to shape: {target_shape}")
 
     def _init_baseline_geometry(self) -> None:
@@ -65,8 +66,8 @@ class Interferometry:
         )
         self.baseline = np.sqrt(
             self.baseline_xyz[:, 0] ** 2
-            + self.baseline_xyz[:, 1] ** 2
-            + self.baseline_xyz[:, 2] ** 2
+            +self.baseline_xyz[:, 1] ** 2
+            +self.baseline_xyz[:, 2] ** 2
         )
 
         rho_unit_x = self.main.P_X_SAT / self.main.P_SAT
@@ -83,13 +84,13 @@ class Interferometry:
         self.baseline_vertical = (
             (self.sub.P_X_SAT[:num_aperture_sample] - self.main.P_X_SAT[:num_aperture_sample])
             * rho_unit_x[:num_aperture_sample]
-            + (self.sub.P_Y_SAT[:num_aperture_sample] - self.main.P_Y_SAT[:num_aperture_sample])
+            +(self.sub.P_Y_SAT[:num_aperture_sample] - self.main.P_Y_SAT[:num_aperture_sample])
             * rho_unit_y[:num_aperture_sample]
-            + (self.sub.P_Z_SAT[:num_aperture_sample] - self.main.P_Z_SAT[:num_aperture_sample])
+            +(self.sub.P_Z_SAT[:num_aperture_sample] - self.main.P_Z_SAT[:num_aperture_sample])
             * rho_unit_z[:num_aperture_sample]
         )
         self.baseline_horizontal = baseline_sign * np.sqrt(
-            np.maximum(self.baseline**2 - self.baseline_vertical**2, 0.0)
+            np.maximum(self.baseline ** 2 - self.baseline_vertical ** 2, 0.0)
         )
 
         self.baseline_offset = 0.0
@@ -118,7 +119,7 @@ class Interferometry:
         clx_m: np.ndarray,
         clx_s: np.ndarray,
         window_size: int,
-        mean_m_squared: Optional[np.ndarray] = None,
+        mean_m_squared: Optional[np.ndarray]=None,
     ) -> np.ndarray:
         ifg = clx_m * np.conj(clx_s)
         mean_ifg = uniform_filter(ifg.real, size=window_size, mode="constant") + 1j * uniform_filter(
@@ -139,13 +140,13 @@ class Interferometry:
         cls,
         clx_m: np.ndarray,
         clx_s: np.ndarray,
-        window_size: int = 4,
-        shift_range_min: int = -2,
-        shift_range_max: int = 2,
-        stride: int = 1,
+        window_size: int=4,
+        shift_range_min: int=-2,
+        shift_range_max: int=2,
+        stride: int=1,
     ) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         height, width = clx_m.shape
-        clx_s = clx_s[:height, :width]
+        clx_s = clx_s[:height,:width]
 
         shifts = np.arange(shift_range_min, shift_range_max + 1)
         h_points = np.arange(0, height, stride)
@@ -231,7 +232,7 @@ class Interferometry:
         )
 
     @classmethod
-    def _convolve2d_safe(cls, image: np.ndarray, kernel: np.ndarray, boundary: str = "edge") -> np.ndarray:
+    def _convolve2d_safe(cls, image: np.ndarray, kernel: np.ndarray, boundary: str="edge") -> np.ndarray:
         pad_image = cls._pad_singlechannel_image(image, kernel.shape, boundary) if boundary else image
         return cls._convolve2d(pad_image, kernel)
 
@@ -256,10 +257,10 @@ class Interferometry:
     def _goldstein_phase_filter(
         cls,
         image: np.ndarray,
-        alpha: float = 0.4,
-        patch_size: int = 64,
-        step: int = 8,
-        filter_size: int = 3,
+        alpha: float=0.4,
+        patch_size: int=64,
+        step: int=8,
+        filter_size: int=3,
     ) -> np.ndarray:
         if patch_size <= 1:
             return image
@@ -270,10 +271,10 @@ class Interferometry:
 
         for y in tqdm(range(0, height - patch_size + 1, step), desc="Goldstein filter"):
             for x in range(0, width - patch_size + 1, step):
-                patch = image[y : y + patch_size, x : x + patch_size]
+                patch = image[y: y + patch_size, x: x + patch_size]
                 filtered = cls._goldstein_filter_patch(patch, alpha, filter_kernel)
-                output[y : y + patch_size, x : x + patch_size] += filtered
-                count[y : y + patch_size, x : x + patch_size] += 1.0
+                output[y: y + patch_size, x: x + patch_size] += filtered
+                count[y: y + patch_size, x: x + patch_size] += 1.0
 
         valid = count > 0
         output[valid] /= count[valid]
@@ -281,34 +282,34 @@ class Interferometry:
         return output
 
     def _compute_topography_phase(self, dem_radar: np.ndarray) -> np.ndarray:
-        dem_radar = dem_radar[: self.num_aperture_sample, : self.num_pixel]
+        dem_radar = dem_radar[: self.num_aperture_sample,: self.num_pixel]
         ret = self.main.DIS_ELLIPSOID_RADIUS + dem_radar
 
         grad_slant_range = np.zeros((self.num_aperture_sample, self.num_pixel), dtype=np.float32)
         slant_range = self.main.SLANT_RANGE_SAMPLE
 
         for idx_line in tqdm(range(self.num_aperture_sample), desc="Topography phase"):
-            ret2 = ret[idx_line, :] ** 2
+            ret2 = ret[idx_line,:] ** 2
             c = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[idx_line]
-            c2 = c**2
+            c2 = c ** 2
 
-            cos_height = (slant_range**2 + c2 - ret2) / (2.0 * slant_range * c)
-            sin_height = np.sqrt(np.maximum(1.0 - cos_height**2, 0.0))
+            cos_height = (slant_range ** 2 + c2 - ret2) / (2.0 * slant_range * c)
+            sin_height = np.sqrt(np.maximum(1.0 - cos_height ** 2, 0.0))
 
             topo_phase = (
-                slant_range**2
-                + self.baseline[idx_line] ** 2
-                - 2.0
+                slant_range ** 2
+                +self.baseline[idx_line] ** 2
+                -2.0
                 * slant_range
                 * self.baseline[idx_line]
                 * (
                     sin_height * self.baseline_cos_alpha[idx_line]
-                    - cos_height * self.baseline_sin_alpha[idx_line]
+                    -cos_height * self.baseline_sin_alpha[idx_line]
                 )
-                - self.baseline_offset**2
+                -self.baseline_offset ** 2
             )
             topo_phase = np.maximum(topo_phase, 0.0)
-            grad_slant_range[idx_line, :] = -slant_range + np.sqrt(topo_phase)
+            grad_slant_range[idx_line,:] = -slant_range + np.sqrt(topo_phase)
 
         cnst = -4.0 * np.pi / self.sub.LAMBDA
         topography = np.exp(1j * cnst * grad_slant_range).astype(np.complex64)
@@ -320,34 +321,34 @@ class Interferometry:
         self, dem_radar_crop: np.ndarray, top_az: int, left_rg: int
     ) -> np.ndarray:
         crop_lines, crop_pixels = dem_radar_crop.shape
-        slant_range = self.main.SLANT_RANGE_SAMPLE[left_rg : left_rg + crop_pixels]
+        slant_range = self.main.SLANT_RANGE_SAMPLE[left_rg: left_rg + crop_pixels]
         ret = self.main.DIS_ELLIPSOID_RADIUS + dem_radar_crop
 
         grad_slant_range = np.zeros((crop_lines, crop_pixels), dtype=np.float32)
 
         for idx_line in tqdm(range(crop_lines), desc="Topography phase (crop)"):
             az_idx = top_az + idx_line
-            ret2 = ret[idx_line, :] ** 2
+            ret2 = ret[idx_line,:] ** 2
             c = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[az_idx]
-            c2 = c**2
+            c2 = c ** 2
 
-            cos_height = (slant_range**2 + c2 - ret2) / (2.0 * slant_range * c)
-            sin_height = np.sqrt(np.maximum(1.0 - cos_height**2, 0.0))
+            cos_height = (slant_range ** 2 + c2 - ret2) / (2.0 * slant_range * c)
+            sin_height = np.sqrt(np.maximum(1.0 - cos_height ** 2, 0.0))
 
             topo_phase = (
-                slant_range**2
-                + self.baseline[az_idx] ** 2
-                - 2.0
+                slant_range ** 2
+                +self.baseline[az_idx] ** 2
+                -2.0
                 * slant_range
                 * self.baseline[az_idx]
                 * (
                     sin_height * self.baseline_cos_alpha[az_idx]
-                    - cos_height * self.baseline_sin_alpha[az_idx]
+                    -cos_height * self.baseline_sin_alpha[az_idx]
                 )
-                - self.baseline_offset**2
+                -self.baseline_offset ** 2
             )
             topo_phase = np.maximum(topo_phase, 0.0)
-            grad_slant_range[idx_line, :] = -slant_range + np.sqrt(topo_phase)
+            grad_slant_range[idx_line,:] = -slant_range + np.sqrt(topo_phase)
 
         cnst = -4.0 * np.pi / self.sub.LAMBDA
         topography = np.exp(1j * cnst * grad_slant_range).astype(np.complex64)
@@ -362,29 +363,36 @@ class Interferometry:
         padded = np.full(target_shape, fill_value, dtype=data.dtype)
         height = min(target_shape[0], data.shape[0])
         width = min(target_shape[1], data.shape[1])
-        padded[:height, :width] = data[:height, :width]
+        padded[:height,:width] = data[:height,:width]
         return padded
 
     def _coregister_slc(
         self,
         slc_main: np.ndarray,
         slc_sub: np.ndarray,
-        fine: bool = True,
-        coherence_window: int = 4,
-        fine_shift_range: int = 2,
-        fine_stride: int = 1,
+        fine: bool=True,
+        coherence_window: int=4,
+        fine_shift_range: int=2,
+        fine_stride: int=1,
+        coarse_downsample: int=1,
     ) -> Tuple[np.ndarray, np.ndarray, Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
-        intensity_main = 10.0 * np.log10(
-            np.clip(np.abs(slc_main) ** 2, a_min=1e-10, a_max=1e+10)
-        )
-        intensity_sub = 10.0 * np.log10(
-            np.clip(np.abs(slc_sub) ** 2, a_min=1e-10, a_max=1e+10)
-        )
+        intensity_main = np.abs(slc_main).astype(np.float32)
+        intensity_main *= intensity_main
+        intensity_sub = np.abs(slc_sub).astype(np.float32)
+        intensity_sub *= intensity_sub
 
-        difference, _ = cv2.phaseCorrelate(
-            intensity_main, intensity_sub
-        )
+        if coarse_downsample > 1:
+            intensity_main = intensity_main[::coarse_downsample,::coarse_downsample]
+            intensity_sub = intensity_sub[::coarse_downsample,::coarse_downsample]
+
+        intensity_main = 10.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10))
+        intensity_sub = 10.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10))
+
+        difference, _ = cv2.phaseCorrelate(intensity_main, intensity_sub)
         shift_range, shift_azimuth = difference
+        if coarse_downsample > 1:
+            shift_range *= coarse_downsample
+            shift_azimuth *= coarse_downsample
 
         slc_sub_coarse = shift(
             slc_sub,
@@ -449,7 +457,7 @@ class Interferometry:
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
         dem_gradient_range = np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32)
-        dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:, :-2]
+        dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:,:-2]
 
         signal_crop = signal[top_az:bot_az, left_rg:right_rg]
         intensity_crop = (
@@ -534,9 +542,9 @@ class Interferometry:
     def _save_jpg(
         image: np.ndarray,
         path: str,
-        vmin: Optional[float] = None,
-        vmax: Optional[float] = None,
-        cmap: Optional[str] = None,
+        vmin: Optional[float]=None,
+        vmax: Optional[float]=None,
+        cmap: Optional[str]=None,
     ) -> None:
         if vmin is None:
             vmin = float(np.nanmin(image))
@@ -548,8 +556,8 @@ class Interferometry:
             scaled = np.clip((image - vmin) / (vmax - vmin), 0.0, 1.0)
         if cmap:
             colormap = cm.get_cmap(cmap)
-            rgb = (colormap(scaled)[..., :3] * 255.0).astype(np.uint8)
-            bgr = rgb[..., ::-1]
+            rgb = (colormap(scaled)[...,:3] * 255.0).astype(np.uint8)
+            bgr = rgb[...,::-1]
             cv2.imwrite(path, bgr)
         else:
             gray = (scaled * 255.0).astype(np.uint8)
@@ -559,65 +567,54 @@ class Interferometry:
     def _save_histogram_jpg(
         values: np.ndarray,
         path: str,
-        bins: int = 256,
-        vmin: float = 0.0,
-        vmax: float = 1.0,
-        threshold: Optional[float] = None,
+        bins: int=256,
+        vmin: float=0.0,
+        vmax: float=1.0,
+        threshold: Optional[float]=None,
     ) -> None:
         valid = np.isfinite(values)
         values = values[valid]
-        if values.size == 0:
-            cv2.imwrite(path, np.zeros((200, bins, 3), dtype=np.uint8))
-            return
-        hist, _ = np.histogram(values, bins=bins, range=(vmin, vmax))
-        hist = hist.astype(np.float32)
-        hist_max = float(hist.max()) if hist.size else 0.0
-        height = 200
-        width = bins
-        image = np.zeros((height, width, 3), dtype=np.uint8)
-        if hist_max > 0:
-            for idx, count in enumerate(hist):
-                bar_height = int((count / hist_max) * (height - 1))
-                if bar_height > 0:
-                    cv2.line(
-                        image,
-                        (idx, height - 1),
-                        (idx, height - 1 - bar_height),
-                        (255, 255, 255),
-                        1,
-                    )
+        fig, ax = plt.subplots(figsize=(16, 6), dpi=120)
+        ax.hist(values, bins=bins, range=(vmin, vmax), color="#2b8cbe", alpha=0.85)
+        ax.set_xlabel("Coherence")
+        ax.set_ylabel("Count")
+        ax.set_title("Coherence Histogram")
+        ax.grid(True, alpha=0.3)
         if threshold is not None:
-            thr = int((threshold - vmin) / (vmax - vmin) * (bins - 1))
-            thr = max(0, min(bins - 1, thr))
-            cv2.line(image, (thr, 0), (thr, height - 1), (0, 0, 255), 1)
-        cv2.imwrite(path, image)
+            ax.axvline(threshold, color="red", linestyle="--", label=f"threshold={threshold:.3f}")
+            ax.legend(loc="upper right")
+        fig.tight_layout()
+        fig.savefig(path)
+        plt.close(fig)
 
     def process(
         self,
         output_dir: str,
-        dem_path: Optional[str] = None,
-        dem_bounds: Optional[Tuple[float, float, float, float]] = None,
-        dem_shape: Optional[Tuple[int, int]] = None,
+        dem_path: Optional[str]=None,
+        dem_bounds: Optional[Tuple[float, float, float, float]]=None,
+        dem_shape: Optional[Tuple[int, int]]=None,
         dem_transform=None,
-        dem_crs: str = "EPSG:4326",
-        buffer_sample: int = 0,
-        look_direction: str = "R",
-        output_prefix: str = "interferometry",
-        fine_registration: bool = True,
-        coherence_window: int = 4,
-        fine_shift_range: int = 2,
-        fine_stride: int = 1,
-        multilook_azimuth: int = 3,
-        multilook_range: int = 4,
-        goldstein_alpha: float = 0.4,
-        goldstein_patch_size: int = 64,
-        goldstein_step: int = 16,
-        goldstein_filter_size: int = 3,
-        coherence_threshold_quantile: Optional[float] = 1.0 / 3.0,
-        dem_coreg_window_size: int = 128,
-        dem_coreg_shift_range: int = 1,
-        dem_coreg_stride: int = 2,
-        sub_buffer: int = 1000
+        dem_crs: str="EPSG:4326",
+        buffer_sample: int=0,
+        look_direction: str="R",
+        output_prefix: str="interferometry",
+        fine_registration: bool=True,
+        coherence_window: int=4,
+        fine_shift_range: int=2,
+        fine_stride: int=1,
+        multilook_azimuth: int=3,
+        multilook_range: int=4,
+        goldstein_alpha: float=0.4,
+        goldstein_patch_size: int=64,
+        goldstein_step: int=16,
+        goldstein_filter_size: int=3,
+        coherence_threshold_quantile: Optional[float]=1.0 / 3.0,
+        coherence_histogram_threshold: Optional[float]=None,
+        dem_coreg_window_size: int=128,
+        dem_coreg_shift_range: int=1,
+        dem_coreg_stride: int=2,
+        slc_coreg_coarse_downsample: int=1,
+        sub_buffer: int=1000,
     ) -> Dict[str, str]:
         geocoder = geocode.Geocode(
             self.main,
@@ -655,8 +652,8 @@ class Interferometry:
         main_offset_rg = left_rg - sub_left
         main_padded = np.zeros(sub_crop.shape, dtype=main_crop.dtype)
         main_padded[
-            main_offset_az : main_offset_az + main_crop.shape[0],
-            main_offset_rg : main_offset_rg + main_crop.shape[1],
+            main_offset_az: main_offset_az + main_crop.shape[0],
+            main_offset_rg: main_offset_rg + main_crop.shape[1],
         ] = main_crop
 
         slc_sub_reg, coherence_reg, _, _ = self._coregister_slc(
@@ -666,15 +663,16 @@ class Interferometry:
             coherence_window=coherence_window,
             fine_shift_range=fine_shift_range,
             fine_stride=fine_stride,
+            coarse_downsample=slc_coreg_coarse_downsample,
         )
 
         slc_sub_reg_main = slc_sub_reg[
-            main_offset_az : main_offset_az + main_crop.shape[0],
-            main_offset_rg : main_offset_rg + main_crop.shape[1],
+            main_offset_az: main_offset_az + main_crop.shape[0],
+            main_offset_rg: main_offset_rg + main_crop.shape[1],
         ]
         coherence_main = coherence_reg[
-            main_offset_az : main_offset_az + main_crop.shape[0],
-            main_offset_rg : main_offset_rg + main_crop.shape[1],
+            main_offset_az: main_offset_az + main_crop.shape[0],
+            main_offset_rg: main_offset_rg + main_crop.shape[1],
         ].astype(np.float32)
 
         interferogram = main_crop * np.conj(slc_sub_reg_main)
@@ -695,10 +693,15 @@ class Interferometry:
 
         coherence_for_hist = coherence_main
         coherence_threshold = None
-        if coherence_threshold_quantile is not None:
-            finite = coherence_main[np.isfinite(coherence_main)]
-            if finite.size > 0:
-                coherence_threshold = float(np.quantile(finite, coherence_threshold_quantile))
+        finite = coherence_main[np.isfinite(coherence_main)]
+        if finite.size > 0:
+            thresholds = []
+            if coherence_threshold_quantile is not None:
+                thresholds.append(float(np.quantile(finite, coherence_threshold_quantile)))
+            if coherence_histogram_threshold is not None:
+                thresholds.append(float(coherence_histogram_threshold))
+            if thresholds:
+                coherence_threshold = max(thresholds)
                 mask = coherence_main >= coherence_threshold
                 intensity_crop = np.where(mask, intensity_crop, 0.0)
                 interferogram = np.where(mask, interferogram, 0.0)
