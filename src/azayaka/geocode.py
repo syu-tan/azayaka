@@ -6,6 +6,8 @@ Azayaka:
 
     Copyright (c) 2026 Syusuke Yasui, Yutaka Yamamoto, and contributors.
     Licensed under the APGL-3.0 License.
+    
+    Equation - Condition: No 3.xxx File.
 
 """
 
@@ -67,15 +69,23 @@ def geocen(lat: Union[float, np.ndarray],
     height = np.asarray(height)
     
     # 測地緯度から地心緯度への第一近似
+    # Equation - Condition: No 3.1
+    # # Geocentric Latitude (approx.) := ArcTan((1 - f)² * tan(φ))
     lats = np.arctan(GRS80.OMFSQ * np.tan(lat))
     
     # 楕円体上の点の地心距離
+    # Equation - Condition: No 3.2
+    # # Ellipsoid Radius := a_p / sqrt(1 + F * cos²(φc))
     rs = GRS80.AP / np.sqrt(1.0 + GRS80.FFACT * np.cos(lats) ** 2)
     
     # 高度を含めた実際の地心距離
+    # Equation - Condition: No 3.3
+    # # Geocentric Distance := sqrt(h² + rs² + 2h * rs *  cos(φ - φc))
     r = np.sqrt(height ** 2 + rs ** 2 + 2 * height * rs * np.cos(lat - lats))
     
     # 地心緯度の計算（高度による補正を含む）
+    # Equation - Condition: No 3.4
+    # # Geocentric Latitude := φc + ArcSin(h * sin(φ - φc) / r)
     latc = lats + np.arcsin(height * np.sin(lat - lats) / r)
     
     return latc, r
@@ -111,6 +121,8 @@ def polcar(lat: Union[float, np.ndarray],
     r = np.asarray(r)
     
     # 各座標成分を計算
+    # Equation - Condition: No 3.5
+    # # ECEF XYZ := r * [cos(φ)cos(λ), cos(φ)sin(λ), sin(φ)]
     x = r * np.cos(lat) * np.cos(lon)
     y = r * np.cos(lat) * np.sin(lon)
     z = r * np.sin(lat)
@@ -203,26 +215,40 @@ def xyz2geo(xyz: Union[np.ndarray, Tuple[float, float, float]]
     y = xyz[..., 1]
     z = xyz[..., 2]
     
-    # 経度の計算（簡単）
+    # 経度の計算
+    # Equation - Condition: No 3.6
+    # # Longitude := ArcTan(Y / X)
     lon = np.arctan2(y, x)
     
     # XY平面での距離
+    # Equation - Condition: No 3.7
+    # # Planar Distance := sqrt(X² + Y²)
     p = np.sqrt(x**2 + y**2)
     
     # Bowringの方法による緯度と高度の反復計算
+    # Equation - Condition: No 3.8
+    # # Auxiliary Angle θ := ArcTan(Z * a / (p * b))
     theta = np.arctan2(z * GRS80.AE, p * GRS80.AP)
     
     # 測地緯度の計算
+    # Equation - Condition: No 3.9
+    # # Geodetic Latitude := ArcTan(
+    # #   (Z + f' b sin³θ) / (p - f' a cos³θ)
+    # # )
     lat = np.arctan2(
         z + GRS80.FFACT * GRS80.AP * np.sin(theta)**3,
         p - GRS80.FFACT * GRS80.AE * np.cos(theta)**3
     )
     
     # 曲率半径
+    # Equation - Condition: No 3.10
+    # # Radius of Curvature := a / sqrt(1 - (2 - f) f sin²φ)
     N = GRS80.AE / np.sqrt(1.0 - (2.0 - GRS80.FLAT) * GRS80.FLAT * np.sin(lat)**2)
     
     # 高度の計算
     # 緯度が極に近い場合と赤道に近い場合で計算方法を分ける
+    # Equation - Condition: No 3.11
+    # # Height := (p / cosφ - N) or (z / sinφ - N(1 - (2 - f)f))
     height = np.where(
         np.abs(lat) < np.pi/4,
         p / np.cos(lat) - N,
@@ -297,10 +323,15 @@ class Geocode(object):
         return dem, transform, self.dem_crs, rasterio.coords.BoundingBox(*bounds)
 
     def _compute_dem_geometry(self):
+        # Equation - Condition: No 3.12
+        # # DEM Grid Center := (i * a + c + a/2, j * e + f + e/2)
+        # where (i, j) are pixel indices (GeoTIFF Raster Matrix convention)
         dem_x = np.arange(self.dem_width) * self.transform.a + self.transform.c + self.transform.a / 2
         dem_y = np.arange(self.dem_height) * self.transform.e + self.transform.f + self.transform.e / 2
         dem_lon, dem_lat = np.meshgrid(dem_x, dem_y)
 
+        # Equation - Condition: No 3.13
+        # # Radian Conversion := deg * π / 180
         dem_lat_rad = np.radians(dem_lat)
         dem_lon_rad = np.radians(dem_lon)
         xyz_dem, _ = geoxyz(dem_lat_rad, dem_lon_rad, self.dem)
@@ -320,12 +351,16 @@ class Geocode(object):
             total=self.dem_height,
         ):
             dem_xyz_lat = xyz_dem[idx_lat]
+            # Equation - Condition: No 3.14
+            # # Zero-Doppler Residual := (Position Earth · Velocity Satellite) - (Position Satellite · Velocity Satellite)
             dot_product = dem_xyz_lat @ sat_vel_t - sat_pos_dot_vel[None, :]
             idx_closest = np.argmin(np.abs(dot_product), axis=1)
             idx_azimuth[idx_lat, :] = idx_closest
 
             sat_pos_closest = sat_pos[idx_closest]
             diff = dem_xyz_lat - sat_pos_closest
+            # Equation - Condition: No 3.15
+            # # Slant Range := sqrt((Position Earth - Position Satellite)²)
             dis_earth_satellite = np.sqrt(np.sum(diff * diff, axis=1))
 
             if slant_sorted:
@@ -357,6 +392,10 @@ class Geocode(object):
         tol: float = 1e-6,
         look_direction: str = "R",
     ) -> Tuple[float, float]:
+        """
+            Developping ... 
+        
+        """
         # Range-Doppler Newton solve on ECEF (zero Doppler).
         p = sat_pos.astype(np.float64).reshape(3)
         v = sat_vel.astype(np.float64).reshape(3)
@@ -367,6 +406,8 @@ class Geocode(object):
             v_norm = np.linalg.norm(v)
             if p_norm == 0.0 or v_norm == 0.0:
                 raise ValueError("Satellite position/velocity norm is zero.")
+            # Equation - Condition: No 3.16
+            # # Unit Vectors := e_r = -p/|p|, e_v = v/|v|, e_c = e_v × e_r
             e_r = -p / p_norm
             e_v = v / v_norm
             e_c = np.cross(e_v, e_r)
@@ -377,12 +418,18 @@ class Geocode(object):
                 e_c = e_c / c_norm
             if look_direction.lower().startswith("l"):
                 e_c = -e_c
+            # Equation - Condition: No 3.17
+            # # Slant Direction := e_s = e_c × e_v
             e_s = np.cross(e_c, e_v)
             e_s = e_s / np.linalg.norm(e_s)
+            # Equation - Condition: No 3.18
+            # # Initial Position := x_g = p + r * e_s
             xg = p + r * e_s
             a = GRS80.AE
             b = GRS80.AP
             denom = (xg[0] ** 2 + xg[1] ** 2) / (a * a) + (xg[2] ** 2) / (b * b)
+            # Equation - Condition: No 3.19
+            # # Ellipsoid Scale := k = 1 / sqrt((x²+y²)/a² + z²/b²)
             k = 1.0 / np.sqrt(denom)
             return k * xg
 
@@ -396,6 +443,8 @@ class Geocode(object):
             if rho == 0.0:
                 break
 
+            # Equation - Condition: No 3.20
+            # # Range-Doppler System := [v·d, |d|² - r², x²/a² + y²/a² + z²/b² - 1]
             e1 = np.dot(v, d)
             e2 = np.dot(d, d) - r * r
             e3 = (x[0] ** 2 + x[1] ** 2) / (a * a) + (x[2] ** 2) / (b * b) - 1.0
@@ -589,6 +638,8 @@ class Geocode(object):
 
         coherence = np.zeros_like(denominator, dtype=np.float32)
         valid_mask = denominator > 1e-10
+        # Equation - Condition: No 3.21
+        # # Correlation := |<M * S>| / sqrt(<|M|²> * <|S|²>)
         coherence[valid_mask] = np.abs(mean_ifg[valid_mask]) / denominator[valid_mask]
         return coherence
 
@@ -850,9 +901,13 @@ class Geocode(object):
         fine_shift_map = None
         if register:
             dem_gradient_range = np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32)
+            # Equation - Condition: No 3.22
+            # # Range Gradient := DEM(x+1) - DEM(x-1)
             dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:, :-2]
 
-            intensity_db = 10 * np.log10(np.clip(np.abs(signal) ** 2, a_min=1e-10, a_max=None)) - 10
+            # Equation - Condition: No 3.23
+            # # Intensity (dB) := 20 log10(|S|) - 10
+            intensity_db = 20 * np.log10(np.clip(np.abs(signal), a_min=1e-10, a_max=None)) - 10
             intensity_crop = intensity_db[top_az:bot_az, left_rg:right_rg]
 
             difference, _ = cv2.phaseCorrelate(dem_gradient_range, intensity_crop)
@@ -874,6 +929,8 @@ class Geocode(object):
             )
         else:
             dem_gradient_range = np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32)
+            # Equation - Condition: No 3.22
+            # # Range Gradient := DEM(x+1) - DEM(x-1)
             dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:, :-2]
             fine_shift_map = (
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),

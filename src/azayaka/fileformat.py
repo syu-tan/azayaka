@@ -19,6 +19,8 @@ Azayaka:
 
     Copyright (c) 2026 Syusuke Yasui, Yutaka Yamamoto, and contributors.
     Licensed under the APGL-3.0 License.
+    
+    Equation - Condition: No 2.xxx File.
 
 """
 
@@ -30,7 +32,6 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-
 # TODO: print -> logger
 # TODO: Base Class Inheritance
 #   utify geometory calculation functions and plotting functions
@@ -39,6 +40,7 @@ from tqdm import tqdm
 
 
 def _write_observation_json(obj, output_path: str):
+
     def _to_list(value):
         if value is None:
             return None
@@ -48,12 +50,18 @@ def _write_observation_json(obj, output_path: str):
     time_end = getattr(obj, "TIME_OBS_END_SEC", None)
     duration = None
     if time_start is not None and time_end is not None:
+        # Equation - Condition: No 2.1
+        # # Observation Duration := T_end - T_start
         duration = float(time_end - time_start)
 
     slant_range = getattr(obj, "SLANT_RANGE_SAMPLE", None)
     if slant_range is not None:
+        # Equation - Condition: No 2.2
+        # # Near/Far Range := min(R), max(R)
         near_range = float(np.min(slant_range))
         far_range = float(np.max(slant_range))
+        # Equation - Condition: No 2.3
+        # # Range Sample Spacing := R[i+1] - R[i]
         range_sample_spacing = float(getattr(obj, "DIS_RANGE_SLANT", slant_range[1] - slant_range[0]))
     else:
         near_range = None
@@ -61,6 +69,8 @@ def _write_observation_json(obj, output_path: str):
         range_sample_spacing = None
 
     height_sat = getattr(obj, "HEIGHT_SAT", None)
+    # Equation - Condition: No 2.4
+    # # Mean Height := mean(Height of Satellite)
     mean_height = float(np.mean(height_sat)) if height_sat is not None else None
 
     scene_id = os.path.basename(getattr(obj, "PATH_CEOS_FOLDER", "")) or None
@@ -91,6 +101,7 @@ def _write_observation_json(obj, output_path: str):
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=True, indent=2)
+
 
 class CEOS_PALSAR_L10_RAW(object):
     """ CEOS Format Reader """
@@ -212,6 +223,8 @@ class CEOS_PALSAR_L10_RAW(object):
         # Tsdlay =tRxs + toff
         # tRxs ： 受信ゲート開始時刻2 (観測補助)
         # toff ： オフセット(-8.31539μsec固定)
+        # Equation - Condition: No 2.5
+        # # Time Gate Delay := (T_sample - T_offset) / 1e9
         self.TIME_GATE_DELAY = (self.TIME_GATE_DELAY_T - 8315.39) / 1e9  # nsec to sec
         print('    -> 受信ゲート開始時刻2 (観測補助) Tsdlay =', self.TIME_GATE_DELAY, '[sec]')
 
@@ -645,7 +658,7 @@ class CEOS_PALSAR_L10_RAW(object):
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
         
-    def set_geometory(self, plot=False, output_json_path: str = None):
+    def set_geometory(self, plot=False, output_json_path: str=None):
         """ 観測ジオメトリの設定 """
         
         self.TIME_SHIFT = 0.0  # [sec] 時刻シフト量
@@ -1480,7 +1493,7 @@ class CEOS_PALSAR_L11_SLC(object):
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
 
-    def set_geometory(self, plot=False, output_json_path: str = None):
+    def set_geometory(self, plot=False, output_json_path: str=None):
         """観測ジオメトリの設定（L1.0 用実装と同じ変数名で動作）"""
 
         self.TIME_SHIFT = 0.0  # [sec]
@@ -2282,10 +2295,20 @@ class CEOS_PALSAR2_L11_SLC(object):
         # ------------------------------------------------------------------
         self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full azimuth
 
+        # Equation - Condition: No 2.6
+        # # Sampling Frequency := f_s(MHz) * 10^6
         self.FREQ_AD_SAMPLE = self.sampling_frequency_mhz * 1e6
+        # Equation - Condition: No 2.7
+        # # PRF := PRF(mHz) * 10^-3
         self.FREQ_PULSE_REPETATION = self.prf_mhz * 1e-3
+        # Equation - Condition: No 2.8
+        # # Pulse Duration := T_chirp(nsec) * 10^-9
         self.TIME_PLUSE_DURATION = self.chirp_length * 1e-9
+        # Equation - Condition: No 2.9
+        # # Ellipsoid Semi-Major := a(km) * 10^3
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
+        # Equation - Condition: No 2.10
+        # # Ellipsoid Semi-Minor := b(km) * 10^3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
         
         print("共通パラメータの設定完了\n")
@@ -2293,7 +2316,7 @@ class CEOS_PALSAR2_L11_SLC(object):
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-2 PALSAR-2 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str = None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 
@@ -2306,6 +2329,8 @@ class CEOS_PALSAR2_L11_SLC(object):
         self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full azimuth
 
         # 軌道情報の時刻配列
+        # Equation - Condition: No 2.11
+        # # Orbit Time Grid := t0 : dt : t0 + dt * N
         self.time_orbit = np.arange(
             self.TIME_DAY_SEC * self.TIME_ORB_COUNT_DAY + self.TIME_ORB_SEC,
             self.TIME_DAY_SEC * self.TIME_ORB_COUNT_DAY
@@ -3193,11 +3218,10 @@ class CEOS_PALSAR3_L11_SLC(object):
 
         print("共通パラメータの設定完了\n")
 
-
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-4 PALSAR-3 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str = None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 
@@ -3230,12 +3254,18 @@ class CEOS_PALSAR3_L11_SLC(object):
         )
 
         # 観測開始／終了時刻（アパーチャ長分だけ確保）
+        # Equation - Condition: No 2.12
+        # # Obs Day Fraction := D + (msec/10^4 + shift) / day_sec
         self.TIME_OBS_START_ = self.TIME_OBS_START_DAY + (
             self.TIME_OBS_START_MSEC / self.DIGIT4 + self.TIME_SHIFT
         ) / self.TIME_DAY_SEC
+        # Equation - Condition: No 2.13
+        # # Obs Start Time := day_sec * T_obs + (N * 0) / PRF
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 0.0
         ) / self.FREQ_PULSE_REPETATION
+        # Equation - Condition: No 2.14
+        # # Obs End Time := day_sec * T_obs + (N * 1) / PRF
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 1.0
         ) / self.FREQ_PULSE_REPETATION
@@ -3270,12 +3300,16 @@ class CEOS_PALSAR3_L11_SLC(object):
             plt.close()
 
         # 観測期間の衛星位置ベクトル
+        # Equation - Condition: No 2.15
+        # # Observation Time Grid := N samples linspace(T_start, T_end, N)
         self.TIMES_OBS = np.linspace(
             self.TIME_OBS_START_SEC, self.TIME_OBS_END_SEC, self.NUM_APERTURE_SAMPLE
         )
         self.P_X_SAT = self.func_intp_orbit_x_recode_time(self.TIMES_OBS)
         self.P_Y_SAT = self.func_intp_orbit_y_recode_time(self.TIMES_OBS)
         self.P_Z_SAT = self.func_intp_orbit_z_recode_time(self.TIMES_OBS)
+        # Equation - Condition: No 2.16
+        # # Satellite Range := sqrt(X² + Y² + Z²)
         self.P_SAT = np.sqrt(self.P_X_SAT ** 2 + self.P_Y_SAT ** 2 + self.P_Z_SAT ** 2)
 
         # 観測期間の衛星速度ベクトル
@@ -3294,8 +3328,12 @@ class CEOS_PALSAR3_L11_SLC(object):
         self.V_Z_SAT = self.func_intp_orbit_vz_recode_time(self.TIMES_OBS)
 
         # レンジ方向サンプル距離
+        # Equation - Condition: No 2.17
+        # # Slant Range Spacing := (Speed of Light) / (2 * f_s)
         self.DIS_RANGE_SLANT = self.SOL / (2.0 * self.FREQ_AD_SAMPLE)
         print("レンジ方向サンプル距離 [m]: ", self.DIS_RANGE_SLANT)
+        # Equation - Condition: No 2.18
+        # # Far Range := R_near + (N - 1) * dR
         self.DIS_FAR_RANGE = (
             self.DIS_NEAR_RANGE + (self.NUM_PIXEL - 1) * self.DIS_RANGE_SLANT
         )
@@ -3307,6 +3345,8 @@ class CEOS_PALSAR3_L11_SLC(object):
         self.DIS_NEAR_RANGE -= self.dis_ionosphere_delay
         self.DIS_FAR_RANGE -= self.dis_ionosphere_delay
 
+        # Equation - Condition: No 2.19
+        # # Slant Range Samples := N samples linspace(R_near, R_far, N)
         self.SLANT_RANGE_SAMPLE = np.linspace(
             self.DIS_NEAR_RANGE,
             self.DIS_FAR_RANGE,
@@ -3315,10 +3355,14 @@ class CEOS_PALSAR3_L11_SLC(object):
         print(f"ニアレンジ: {self.DIS_NEAR_RANGE} m, ファーレンジ: {self.DIS_FAR_RANGE} m")
 
         # 高度計算
+        # Equation - Condition: No 2.20
+        # # Satellite Latitude := ArcSin(Z / |Position Satellite|)
         self.P_SAT_LATITUDE = np.arcsin(self.P_Z_SAT / self.P_SAT)
         self.SIN_SAT_LATITUDE = np.sin(self.P_SAT_LATITUDE)
         self.COS_SAT_LATITUDE = np.cos(self.P_SAT_LATITUDE)
 
+        # Equation - Condition: No 2.21
+        # # Earth Radius := 1 / sqrt(cos²φ/a² + sin²φ/b²)
         self.P_EARTH_RADIUS = np.divide(
             1.0,
             np.sqrt(
@@ -3326,6 +3370,8 @@ class CEOS_PALSAR3_L11_SLC(object):
                 +self.SIN_SAT_LATITUDE ** 2 / self.DIS_ELLIPSOID_SHORT_RADIUS ** 2
             ),
         )
+        # Equation - Condition: No 2.22
+        # # Satellite Height := |Position Satellite| - Earth Radius
         self.HEIGHT_SAT = self.P_SAT - self.P_EARTH_RADIUS
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
         if output_json_path:

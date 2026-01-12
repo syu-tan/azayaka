@@ -7,6 +7,7 @@ Azayaka:
     Copyright (c) 2026 Syusuke Yasui, Yutaka Yamamoto, and contributors.
     Licensed under the APGL-3.0 License.
 
+    Equation - Condition: No 1.xxx File.
 """
 import os
 import gc
@@ -45,11 +46,16 @@ class Interferometry:
             min(main_shape[1], sub_shape[1]),
         )
         # Crop to the common area to avoid allocating padded arrays.
+        # Equation - Condition: No 1.1
+        # # Select the minimum (Azimuth Sample, Range Sample) between main and sub.
         self.main.signal = self.main.signal[: target_shape[0],: target_shape[1]]
         self.sub.signal = self.sub.signal[: target_shape[0],: target_shape[1]]
         print(f"Aligned main/sub signals to shape: {target_shape}")
 
-    def _init_baseline_geometry(self) -> None:
+    def _init_baseline_geometry(self, baseline_offset=0.0) -> None:
+        # Parameter
+        self.baseline_offset = baseline_offset
+        
         num_aperture_sample = min(
             int(self.main.NUM_APERTURE_SAMPLE), int(self.sub.NUM_APERTURE_SAMPLE)
         )
@@ -64,16 +70,22 @@ class Interferometry:
             ],
             axis=1,
         )
+        # Equation - Condition: No 1.2
+        # # Baseline := √(X² + Y² + Z²)
         self.baseline = np.sqrt(
             self.baseline_xyz[:, 0] ** 2
             +self.baseline_xyz[:, 1] ** 2
             +self.baseline_xyz[:, 2] ** 2
         )
 
-        rho_unit_x = self.main.P_X_SAT / self.main.P_SAT
-        rho_unit_y = self.main.P_Y_SAT / self.main.P_SAT
-        rho_unit_z = self.main.P_Z_SAT / self.main.P_SAT
+        # Equation - Condition: No 1.3
+        # # Slant Range Unit Vector := S / |S|
+        slant_range_unit_x = self.main.P_X_SAT / self.main.P_SAT
+        slant_range_unit_y = self.main.P_Y_SAT / self.main.P_SAT
+        slant_range_unit_z = self.main.P_Z_SAT / self.main.P_SAT
 
+        # Equation - Condition: No 1.4
+        # # Correct 3D Geometry directions -> Ascending and Longitude consideration
         baseline_sign = self._earth_sign(
             self.main.P_X_SAT,
             self.main.P_Y_SAT,
@@ -81,25 +93,36 @@ class Interferometry:
             self.sub.P_Y_SAT[:num_aperture_sample],
             getattr(self.main, "ORBIT_NAME", ""),
         )
+        
+        # Equation - Condition: No 1.5
+        # # Baseline Prependicular := (Baseline) ・ (S)
         self.baseline_vertical = (
             (self.sub.P_X_SAT[:num_aperture_sample] - self.main.P_X_SAT[:num_aperture_sample])
-            * rho_unit_x[:num_aperture_sample]
+            * slant_range_unit_x[:num_aperture_sample]
             +(self.sub.P_Y_SAT[:num_aperture_sample] - self.main.P_Y_SAT[:num_aperture_sample])
-            * rho_unit_y[:num_aperture_sample]
+            * slant_range_unit_y[:num_aperture_sample]
             +(self.sub.P_Z_SAT[:num_aperture_sample] - self.main.P_Z_SAT[:num_aperture_sample])
-            * rho_unit_z[:num_aperture_sample]
+            * slant_range_unit_z[:num_aperture_sample]
         )
+        
+        # Equation - Condition: No 1.6
+        # # Baseline Horizontal := √(Baseline² - Baseline Perpendicular²)
         self.baseline_horizontal = baseline_sign * np.sqrt(
             np.maximum(self.baseline ** 2 - self.baseline_vertical ** 2, 0.0)
         )
 
-        self.baseline_offset = 0.0
+        # Equation - Condition: No 1.7
+        # # Baseline Angle α := ArcTan(Baseline Perpendicular / Baseline Horizontal)
         self.baseline_angle_alpha = np.arctan2(
             self.baseline_vertical + self.baseline_offset, self.baseline_horizontal
         )
+        # Equation - Condition: No 1.8
+        # # Baseline Cosine/Sine α := Cosine/Sine(Baseline Angle α)
         self.baseline_cos_alpha = np.cos(self.baseline_angle_alpha)
         self.baseline_sin_alpha = np.sin(self.baseline_angle_alpha)
-
+        
+        # Equation - Condition: No 1.9 from No 2.2
+        # # Height of Main Satellite
         self.height_sat = self.main.HEIGHT_SAT[:num_aperture_sample]
         print("Initialized baseline geometry for interferometry processing.")
 
@@ -134,6 +157,8 @@ class Interferometry:
 
         coherence = np.zeros_like(denominator, dtype=np.float32)
         valid_mask = denominator > 1e-10
+        # Equation - Condition: No 1.10
+        # # Coherence := |<M> * <S>| / sqrt(<|M|²> * <|S|²>)
         coherence[valid_mask] = np.abs(mean_ifg[valid_mask]) / denominator[valid_mask]
         return coherence
 
@@ -246,6 +271,9 @@ class Interferometry:
     def _goldstein_filter_patch(
         cls, patch: np.ndarray, alpha: float, filter_kernel: np.ndarray
     ) -> np.ndarray:
+        # Goldstein Phase Filter for a single patch
+        # Equation - Condition: No 1.16
+        # # Goldstein Filtered Patch := IFFT{ FFT{Patch} * |FFT{Patch} * H_conj|^α }
         patch_fft = np.fft.fft2(patch)
         patch_fft = np.fft.fftshift(patch_fft)
         if alpha > 0:
@@ -285,37 +313,44 @@ class Interferometry:
 
     def _compute_topography_phase(self, dem_radar: np.ndarray) -> np.ndarray:
         dem_radar = dem_radar[: self.num_aperture_sample,: self.num_pixel]
-        ret = self.main.DIS_ELLIPSOID_RADIUS + dem_radar
+        height_main_observation = self.main.DIS_ELLIPSOID_RADIUS + dem_radar
 
-        grad_slant_range = np.zeros((self.num_aperture_sample, self.num_pixel), dtype=np.float32)
+        slant_range_delta = np.zeros((self.num_aperture_sample, self.num_pixel), dtype=np.float32)
         slant_range = self.main.SLANT_RANGE_SAMPLE
 
         for idx_line in tqdm(range(self.num_aperture_sample), desc="Topography phase"):
-            ret2 = ret[idx_line,:] ** 2
-            c = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[idx_line]
-            c2 = c ** 2
-
-            cos_height = (slant_range ** 2 + c2 - ret2) / (2.0 * slant_range * c)
-            sin_height = np.sqrt(np.maximum(1.0 - cos_height ** 2, 0.0))
-
-            topo_phase = (
+            
+            # Equation - Condition: No 1.11
+            # # Height Cosine/Sine := (R² + H_sub² - H_main²) / (2 * R * H_sub)
+            height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[idx_line]
+            height_cos_theta = (slant_range ** 2 + height_sub ** 2 - height_main_observation[idx_line,:] ** 2) / \
+                (2.0 * slant_range * height_sub)
+            height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
+            
+            # Equation - Condition: No 1.12
+            # # Topography Phase Simulation := R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
+            topography_phase_simulation = (
                 slant_range ** 2
                 +self.baseline[idx_line] ** 2
                 -2.0
                 * slant_range
                 * self.baseline[idx_line]
                 * (
-                    sin_height * self.baseline_cos_alpha[idx_line]
-                    -cos_height * self.baseline_sin_alpha[idx_line]
+                    height_sin_theta * self.baseline_cos_alpha[idx_line]
+                    -height_cos_theta * self.baseline_sin_alpha[idx_line]
                 )
                 -self.baseline_offset ** 2
             )
-            topo_phase = np.maximum(topo_phase, 0.0)
-            grad_slant_range[idx_line,:] = -slant_range + np.sqrt(topo_phase)
+            topography_phase_simulation = np.maximum(topography_phase_simulation, 0.0)
+            
+            # Equation - Condition: No 1.13
+            # # Δ Slant Range ΔS := -R + √(Topography Phase Simulation)
+            slant_range_delta[idx_line,:] = -slant_range + np.sqrt(topography_phase_simulation)
 
-        cnst = -4.0 * np.pi / self.sub.LAMBDA
-        topography = np.exp(1j * cnst * grad_slant_range).astype(np.complex64)
-        del grad_slant_range
+        # Equation - Condition: No 1.14
+        # # Topography Phase := exp(j * -4π / λ * ΔS)
+        topography = np.exp(1j * -4.0 * np.pi / self.sub.LAMBDA * slant_range_delta).astype(np.complex64)
+        del slant_range_delta
         gc.collect()
         return topography
 
@@ -324,37 +359,49 @@ class Interferometry:
     ) -> np.ndarray:
         crop_lines, crop_pixels = dem_radar_crop.shape
         slant_range = self.main.SLANT_RANGE_SAMPLE[left_rg: left_rg + crop_pixels]
-        ret = self.main.DIS_ELLIPSOID_RADIUS + dem_radar_crop
+        height_main_observation = self.main.DIS_ELLIPSOID_RADIUS + dem_radar_crop
 
-        grad_slant_range = np.zeros((crop_lines, crop_pixels), dtype=np.float32)
+        slant_range_delta = np.zeros((crop_lines, crop_pixels), dtype=np.float32)
 
         for idx_line in tqdm(range(crop_lines), desc="Topography phase (crop)"):
             az_idx = top_az + idx_line
-            ret2 = ret[idx_line,:] ** 2
-            c = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[az_idx]
-            c2 = c ** 2
+            
+            # Equation - Condition: No 1.11
+            # # Height Cosine/Sine := (R² + H_sub² - H_main²) / (2 * R * H_sub)
+            height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[az_idx]
+            height_cos_theta = (
+                slant_range ** 2
+                + height_sub ** 2
+                - height_main_observation[idx_line,:] ** 2
+            ) / (2.0 * slant_range * height_sub)
+            height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
 
-            cos_height = (slant_range ** 2 + c2 - ret2) / (2.0 * slant_range * c)
-            sin_height = np.sqrt(np.maximum(1.0 - cos_height ** 2, 0.0))
-
-            topo_phase = (
+            # Equation - Condition: No 1.12
+            # # Topography Phase Simulation := R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
+            topography_phase_simulation = (
                 slant_range ** 2
                 +self.baseline[az_idx] ** 2
                 -2.0
                 * slant_range
                 * self.baseline[az_idx]
                 * (
-                    sin_height * self.baseline_cos_alpha[az_idx]
-                    -cos_height * self.baseline_sin_alpha[az_idx]
+                    height_sin_theta * self.baseline_cos_alpha[az_idx]
+                    -height_cos_theta * self.baseline_sin_alpha[az_idx]
                 )
                 -self.baseline_offset ** 2
             )
-            topo_phase = np.maximum(topo_phase, 0.0)
-            grad_slant_range[idx_line,:] = -slant_range + np.sqrt(topo_phase)
+            topography_phase_simulation = np.maximum(topography_phase_simulation, 0.0)
+            
+            # Equation - Condition: No 1.13
+            # # Δ Slant Range ΔS := -R + √(Topography Phase Simulation)
+            slant_range_delta[idx_line,:] = -slant_range + np.sqrt(topography_phase_simulation)
 
-        cnst = -4.0 * np.pi / self.sub.LAMBDA
-        topography = np.exp(1j * cnst * grad_slant_range).astype(np.complex64)
-        del grad_slant_range
+        # Equation - Condition: No 1.14
+        # # Topography Phase := exp(j * -4π / λ * ΔS)
+        topography = np.exp(
+            1j * -4.0 * np.pi / self.sub.LAMBDA * slant_range_delta
+        ).astype(np.complex64)
+        del slant_range_delta
         gc.collect()
         return topography
 
@@ -362,6 +409,8 @@ class Interferometry:
     def _pad_to_shape(
         data: np.ndarray, target_shape: Tuple[int, int], fill_value
     ) -> np.ndarray:
+        # Equation - Condition: No 1.15
+        # # Pad data to target shape with fill_value
         padded = np.full(target_shape, fill_value, dtype=data.dtype)
         height = min(target_shape[0], data.shape[0])
         width = min(target_shape[1], data.shape[1])
@@ -387,9 +436,16 @@ class Interferometry:
             intensity_main = intensity_main[::coarse_downsample,::coarse_downsample]
             intensity_sub = intensity_sub[::coarse_downsample,::coarse_downsample]
 
-        intensity_main = 10.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10))
-        intensity_sub = 10.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10))
+        # Convert to dB scale
+        # Equation - Condition: No 1.17
+        # # Intensity (dB) := 10 * log10(Intensity^2) + Adjustment
+        intensity_main = 20.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10))
+        intensity_sub = 20.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10))
 
+        # Coarse coregistration using phase correlation
+        # Equation - Condition: No 1.18
+        # # F_k(χ,η) =F {f_k(x,y)} (k=1,2)
+        # # Shift(Δx,Δy) = argmax_(χ,η) { |F_1(χ,η) * F_2_conj(χ,η)| / (|F_1(χ,η)| * |F_2(χ,η)|) }
         difference, _ = cv2.phaseCorrelate(intensity_main, intensity_sub)
         shift_range, shift_azimuth = difference
         if coarse_downsample > 1:
@@ -458,13 +514,20 @@ class Interferometry:
             raise ValueError("No overlap between radar coordinates and DEM after cropping")
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
+        # DEM gradient computation
+        # Equation - Condition: No 1.19
+        # # DEM Gradient Range := DEM_Radar(x, y+1) - DEM_Radar(x, y-1)
         dem_gradient_range = np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32)
         dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:,:-2]
 
         signal_crop = signal[top_az:bot_az, left_rg:right_rg]
+        # Convert to intensity in dB scale
+        # Equation - Condition: No 1.17 (repeated)
         intensity_crop = (
-            10.0 * np.log10(np.clip(np.abs(signal_crop) ** 2, a_min=1e-10, a_max=None)) - 10.0
+            20.0 * np.log10(np.clip(np.abs(signal_crop), a_min=1e-10, a_max=None)) - 10.0
         )
+        
+        # Equation - Condition: No 1.18 (repeated)
         difference, _ = cv2.phaseCorrelate(
             dem_gradient_range.astype(np.float32), intensity_crop.astype(np.float32)
         )
@@ -831,8 +894,3 @@ class Interferometry:
         )
 
         return outputs
-
-
-class Interferometory(Interferometry):
-    """Backward-compatible spelling for Interferometry."""
-    
