@@ -104,13 +104,15 @@ class Interferometry:
         print("Initialized baseline geometry for interferometry processing.")
 
     @staticmethod
-    def _earth_sign(x11, y11, x21, y21, orbit_name: str) -> int:
-        rlnref = np.arctan2(y11, x11)
-        rlnrep = np.arctan2(y21, x21)
-        sign = 1
+    def _earth_sign(x_main, y_main, x_sub, y_sub, orbit_name: str, sign: int=1) -> int:
+        longiture_main = np.arctan2(y_main, x_main)
+        longiture_sub = np.arctan2(y_sub, x_sub)
+
         if str(orbit_name).upper() == "D":
+            # 衛星が南下軌道の場合
             sign *= -1
-        if np.all(rlnrep < rlnref):
+        if np.all(longiture_sub < longiture_main):
+            # 地球の中心から見て、sub衛星がmain衛星よりも西側にある場合
             sign *= -1
         return sign
 
