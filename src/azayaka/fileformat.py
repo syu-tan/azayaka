@@ -1691,6 +1691,7 @@ class CEOS_PALSAR2_L11_SLC(object):
         self.PATH_LED = None
         self.PATH_IMG = None
 
+        # TODO: POLARIMETORY and ORBIT_NAME should be automatically determined from the files
         for name in ceos_files:
             if name.startswith("LED-") and name.endswith(f"__{self.ORBIT_NAME}"):
                 self.PATH_LED = os.path.join(self.PATH_CEOS_FOLDER, name)
