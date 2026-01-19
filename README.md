@@ -1,4 +1,4 @@
-# azayaka
+![img](./doc/figure/001_project_icon.png)
 
 azayaka is a Python package for SAR (Synthetic Aperture Radar) processing and a simple InSAR Project.
 
