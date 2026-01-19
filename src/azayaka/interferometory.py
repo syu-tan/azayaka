@@ -121,7 +121,7 @@ class Interferometry:
         self.baseline_cos_alpha = np.cos(self.baseline_angle_alpha)
         self.baseline_sin_alpha = np.sin(self.baseline_angle_alpha)
         
-        # Equation - Condition: No 1.9 from No 2.2
+        # Equation - Condition: No 1.9 from No 2.22
         # # Height of Main Satellite
         self.height_sat = self.main.HEIGHT_SAT[:num_aperture_sample]
         print("Initialized baseline geometry for interferometry processing.")
@@ -158,7 +158,7 @@ class Interferometry:
         coherence = np.zeros_like(denominator, dtype=np.float32)
         valid_mask = denominator > 1e-10
         # Equation - Condition: No 1.10
-        # # Coherence := |<M> * <S>| / sqrt(<|M|²> * <|S|²>)
+        # # Coherence := |Σ(M * conj(S))| / sqrt(Σ(M²) * Σ(S²))
         coherence[valid_mask] = np.abs(mean_ifg[valid_mask]) / denominator[valid_mask]
         return coherence
 
@@ -321,14 +321,15 @@ class Interferometry:
         for idx_line in tqdm(range(self.num_aperture_sample), desc="Topography phase"):
             
             # Equation - Condition: No 1.11
-            # # Height Cosine/Sine := (R² + H_sub² - H_main²) / (2 * R * H_sub)
+            # # Height Cosine = (R² + H_sub² - H_main_obs²) / (2 * R * H_sub)
+            # # Height Sine = √(1 - Cosine²)
             height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[idx_line]
             height_cos_theta = (slant_range ** 2 + height_sub ** 2 - height_main_observation[idx_line,:] ** 2) / \
                 (2.0 * slant_range * height_sub)
             height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
             
             # Equation - Condition: No 1.12
-            # # Topography Phase Simulation := R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
+            # # Topography Phase Simulation = R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
             topography_phase_simulation = (
                 slant_range ** 2
                 +self.baseline[idx_line] ** 2
@@ -371,8 +372,8 @@ class Interferometry:
             height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[az_idx]
             height_cos_theta = (
                 slant_range ** 2
-                + height_sub ** 2
-                - height_main_observation[idx_line,:] ** 2
+                +height_sub ** 2
+                -height_main_observation[idx_line,:] ** 2
             ) / (2.0 * slant_range * height_sub)
             height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
 
@@ -439,8 +440,8 @@ class Interferometry:
         # Convert to dB scale
         # Equation - Condition: No 1.17
         # # Intensity (dB) := 10 * log10(Intensity^2) + Adjustment
-        intensity_main = 20.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10))
-        intensity_sub = 20.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10))
+        intensity_main = 20.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10)) - 10.0
+        intensity_sub = 20.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10)) - 10.0
 
         # Coarse coregistration using phase correlation
         # Equation - Condition: No 1.18
