@@ -3300,7 +3300,7 @@ class CEOS_PALSAR3_L11_SLC(object):
             plt.close()
 
         # 観測期間の衛星位置ベクトル
-        # Equation - Condition: No 2.15
+        # Equation - Condition: No 2.15 from No 2.11
         # # Observation Time Grid := N samples linspace(T_start, T_end, N)
         self.TIMES_OBS = np.linspace(
             self.TIME_OBS_START_SEC, self.TIME_OBS_END_SEC, self.NUM_APERTURE_SAMPLE
@@ -3345,7 +3345,7 @@ class CEOS_PALSAR3_L11_SLC(object):
         self.DIS_NEAR_RANGE -= self.dis_ionosphere_delay
         self.DIS_FAR_RANGE -= self.dis_ionosphere_delay
 
-        # Equation - Condition: No 2.19
+        # Equation - Condition: No 2.19 from No 2.18
         # # Slant Range Samples := N samples linspace(R_near, R_far, N)
         self.SLANT_RANGE_SAMPLE = np.linspace(
             self.DIS_NEAR_RANGE,
@@ -3356,7 +3356,7 @@ class CEOS_PALSAR3_L11_SLC(object):
 
         # 高度計算
         # Equation - Condition: No 2.20
-        # # Satellite Latitude := ArcSin(Z / |Position Satellite|)
+        # # Satellite Latitude angle phi φ := ArcSin(Z / |Position Satellite|)
         self.P_SAT_LATITUDE = np.arcsin(self.P_Z_SAT / self.P_SAT)
         self.SIN_SAT_LATITUDE = np.sin(self.P_SAT_LATITUDE)
         self.COS_SAT_LATITUDE = np.cos(self.P_SAT_LATITUDE)
