@@ -19,6 +19,9 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self._processing = False
         # Initialize the text area in the log tab
         self.plainTextEdit.clear()
+        # Initialize the progress bar
+        self.progressBar.setValue(0)
+        self.progressBar.setFormat("%p%")
 
     def accept(self):
         """Handler for OK button press

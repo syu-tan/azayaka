@@ -54,6 +54,7 @@ class InterferometryWorker(QThread):
     finished = pyqtSignal()
     error = pyqtSignal(str)
     log_message = pyqtSignal(str)
+    progress = pyqtSignal(int)
 
     def __init__(self, inputs, logger):
         super().__init__()
@@ -63,6 +64,7 @@ class InterferometryWorker(QThread):
     def run(self):
         """run InSAR processing"""
         try:
+            self.progress.emit(0)
             self.log_message.emit("Starting InSAR processing")
             QApplication.processEvents()
 
@@ -98,6 +100,7 @@ class InterferometryWorker(QThread):
                 POLARIMETORY="HH",
                 ORBIT_NAME="A",
             )
+            self.progress.emit(15)
             self.log_message.emit("Setting geometry for main CEOS...")
             QApplication.processEvents()
             main_ceos.set_geometory(plot=False, output_json_path=path_main_metadata_json)
@@ -107,6 +110,7 @@ class InterferometryWorker(QThread):
                 POLARIMETORY="HH",
                 ORBIT_NAME="A",
             )
+            self.progress.emit(30)
             self.log_message.emit("Setting geometry for sub CEOS...")
             QApplication.processEvents()
             sub_ceos.set_geometory(plot=False, output_json_path=path_sub_metadata_json)
@@ -114,12 +118,14 @@ class InterferometryWorker(QThread):
             self.log_message.emit("Initializing Interferometry...")
             QApplication.processEvents()
             interferometry = Interferometry(main_ceos, sub_ceos)
-            
+            self.progress.emit(45)
+
             del main_ceos, sub_ceos
             gc.collect()
 
             self.log_message.emit("Starting interferometry processing...")
             QApplication.processEvents()
+            self.progress.emit(50)
 
             outputs = interferometry.process(
                 output_dir=self.inputs['output_dir'],
@@ -145,6 +151,7 @@ class InterferometryWorker(QThread):
 
             self.log_message.emit("InSAR processing completed successfully")
             QApplication.processEvents()
+            self.progress.emit(100)
             message = "InSAR processing completed successfully!\n\nOutput files:\n"
             for key, path in outputs.items():
                 message += f"{key}: {path}\n"
@@ -162,6 +169,7 @@ class GeocodeWorker(QThread):
     finished = pyqtSignal()
     error = pyqtSignal(str)
     log_message = pyqtSignal(str)
+    progress = pyqtSignal(int)
 
     def __init__(self, inputs, logger):
         super().__init__()
@@ -171,6 +179,7 @@ class GeocodeWorker(QThread):
     def run(self):
         """run Geocoding processing"""
         try:
+            self.progress.emit(0)
             self.log_message.emit("Starting Geocoding processing")
             QApplication.processEvents()
 
@@ -208,12 +217,14 @@ class GeocodeWorker(QThread):
                     POLARIMETORY="HH",
                     ORBIT_NAME="A",
                 )
+                self.progress.emit(20)
             else:
                 self.error.emit(f"Processing Start Level {self.inputs['processing_start_level']} is not yet supported")
                 return
 
             self.log_message.emit("Setting geometry...")
             ceos.set_geometory(plot=False, output_json_path=output_geometory_json)
+            self.progress.emit(40)
 
             self.log_message.emit("Initializing Geocoder...")
             geocoder = Geocode(
@@ -221,13 +232,16 @@ class GeocodeWorker(QThread):
                 dem_path=self.inputs['dem_path'],
                 buffer_sample=0,
             )
+            self.progress.emit(50)
 
             self.log_message.emit("Saving scene KML...")
             geocoder.save_scene_kml(out_kml, max_iter=2000)
+            self.progress.emit(60)
 
             signal = ceos.signal
 
             self.log_message.emit("Starting geocoding (this may take a while)...")
+            self.progress.emit(65)
 
             out = geocoder.geocode(
                 signal=signal,
@@ -239,6 +253,7 @@ class GeocodeWorker(QThread):
 
             self.log_message.emit("Geocoding processing completed successfully!")
             self.log_message.emit(f"Output files - Intensity: {out_intensity}, Phase: {out_phase}, KML: {out_kml}")
+            self.progress.emit(100)
             self.finished.emit()
 
         except Exception as e:
@@ -465,6 +480,8 @@ class AzayakaPlugin:
         self.logger.info("=" * 50)
         self.logger.info("Processing started")
         self.logger.info(f"Current tab index: {current_tab}")
+        # reset progress bar
+        self.dlg.progressBar.setValue(0)
         QApplication.processEvents()
         # execute the processing asynchronously using QTimer (the UI is not blocked)
         QTimer.singleShot(100, lambda: self._start_processing(current_tab))
@@ -516,6 +533,7 @@ class AzayakaPlugin:
 
         # connect the signals
         self.insar_worker.log_message.connect(lambda msg: self.logger.info(msg))
+        self.insar_worker.progress.connect(self.dlg.progressBar.setValue)
         self.insar_worker.finished.connect(self._on_insar_finished)
         self.insar_worker.error.connect(self._on_insar_error)
 
@@ -524,13 +542,15 @@ class AzayakaPlugin:
 
     def _on_insar_finished(self):
         """Handler for InSAR processing completed"""
+        self.dlg.progressBar.setValue(100)
         self.dlg.processing_completed()
-        self.logger.info("Processing completed. Dialog will remain open.")
+        self.logger.info("Processing completed!")
         QMessageBox.information(self.dlg, "Success", "InSAR processing completed successfully!")
         QApplication.processEvents()
 
     def _on_insar_error(self, error_msg):
         """Handler for InSAR processing error"""
+        self.dlg.progressBar.setValue(0)
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"InSAR processing failed:\n{error_msg}")
         self.dlg.processing_completed()
@@ -567,6 +587,7 @@ class AzayakaPlugin:
         
         # connect the signals
         self.geocode_worker.log_message.connect(lambda msg: self.logger.info(msg))
+        self.geocode_worker.progress.connect(self.dlg.progressBar.setValue)
         self.geocode_worker.finished.connect(self._on_geocoding_finished)
         self.geocode_worker.error.connect(self._on_geocoding_error)
         
@@ -575,6 +596,7 @@ class AzayakaPlugin:
     
     def _on_geocoding_finished(self):
         """Handler for Geocoding processing completed"""
+        self.dlg.progressBar.setValue(100)
         self.dlg.processing_completed()
         self.logger.info("Processing completed. Dialog will remain open.")
         QMessageBox.information(self.dlg, "Success", "Geocoding processing completed successfully!")
@@ -582,6 +604,7 @@ class AzayakaPlugin:
     
     def _on_geocoding_error(self, error_msg):
         """Handler for Geocoding processing error"""
+        self.dlg.progressBar.setValue(0)
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"Geocoding processing failed:\n{error_msg}")
         self.dlg.processing_completed()
