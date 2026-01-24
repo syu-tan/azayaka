@@ -24,12 +24,13 @@ pyrcc5 -o resources.py resources.qrc
 
 ## 開発側でのQGISの動作確認
 
-pypiを毎回更新してpip installするのは手間なので手動で以下のように作業すると楽
+開発中に毎回pip installするのが手間な場合、ファイルを手動で配置する事も可能
 
-- qgis_plugin用のソースファイルの配置
-    - azayaka\src_qgis_plugin配下のファイルをローカルのazayaka_plugin配下にコピペ
-    - ※windowsでのazayaka_pluginの場所
-        - C:\Users\hogehoge\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\azayaka_plugin
+- 1. azayakaのsrcファイル(pip installの対象ファイル群)を以下に配置
+    - C:\Users\hogehoge\AppData\Roaming\Python\Python312\site-packages\azayaka
 
-- プラグインのリロード
+- 2. azayaka\src_qgis_plugin配下のファイルを以下に配置
+    - C:\Users\hogehoge\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\azayaka_plugin
+
+- 3. プラグインのリロード
     QGISのプラグイン'Plugin Reloader'を使用するとQGISを再起動しなくて良いため、効率的
