@@ -58,7 +58,7 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setEnabled(True)
         # disable the cancel button
         self.cancelButton.setEnabled(False)
-        self.cancelButton.setText("The process stopped")
+        self.cancelButton.setText("Stop")
         # change the text of the OK button (the text is changed after processing)
         # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText("閉じる")
 
@@ -95,7 +95,7 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
     def _on_cancel_clicked(self):
         """Handler for cancel button press"""
         self.cancelButton.setEnabled(False)
-        self.cancelButton.setText("The process stopped")
+        self.cancelButton.setText("Stop")
         # Emit cancel signal to the worker (will be connected in the plugin class)
         if hasattr(self, '_cancel_callback') and self._cancel_callback:
             self._cancel_callback()

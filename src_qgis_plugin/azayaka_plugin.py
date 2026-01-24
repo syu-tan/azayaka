@@ -574,7 +574,7 @@ class AzayakaPlugin:
 
         # setup cancel functionality
         self.dlg.cancelButton.setEnabled(True)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.dlg._cancel_callback = self.insar_worker.cancel
 
         # start the worker thread
@@ -584,7 +584,7 @@ class AzayakaPlugin:
         """Handler for InSAR processing completed"""
         self.dlg.progressBar.setValue(100)
         self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.dlg.processing_completed()
         self.logger.info("Processing completed!")
         QMessageBox.information(self.dlg, "Success", "InSAR processing completed successfully!")
@@ -594,7 +594,7 @@ class AzayakaPlugin:
         """Handler for InSAR processing error"""
         self.dlg.progressBar.setValue(0)
         self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"InSAR processing failed:\n{error_msg}")
         self.dlg.processing_completed()
@@ -648,7 +648,7 @@ class AzayakaPlugin:
 
         # setup cancel functionality
         self.dlg.cancelButton.setEnabled(True)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.dlg._cancel_callback = self.geocode_worker.cancel
         
         # start the worker thread
@@ -658,7 +658,7 @@ class AzayakaPlugin:
         """Handler for Geocoding processing completed"""
         self.dlg.progressBar.setValue(100)
         self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.dlg.processing_completed()
         self.logger.info("Processing completed. Dialog will remain open.")
         QMessageBox.information(self.dlg, "Success", "Geocoding processing completed successfully!")
@@ -668,7 +668,7 @@ class AzayakaPlugin:
         """Handler for Geocoding processing error"""
         self.dlg.progressBar.setValue(0)
         self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"Geocoding processing failed:\n{error_msg}")
         self.dlg.processing_completed()
@@ -678,7 +678,7 @@ class AzayakaPlugin:
         """Handler for Geocoding processing cancelled"""
         self.dlg.progressBar.setValue(0)
         self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.cancelButton.setText("Stop")
         self.dlg.clear_log()
         self.dlg.processing_completed()
         self.logger.info("Processing cancelled by user")
