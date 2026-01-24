@@ -55,11 +55,18 @@ class InterferometryWorker(QThread):
     error = pyqtSignal(str)
     log_message = pyqtSignal(str)
     progress = pyqtSignal(int)
+    cancelled = pyqtSignal()
 
     def __init__(self, inputs, logger):
         super().__init__()
         self.inputs = inputs
         self.logger = logger
+        self.is_cancelled = False
+
+    def cancel(self):
+        """Cancel the processing"""
+        self.is_cancelled = True
+        self.log_message.emit("Processing cancellation requested. Wait for a moment to stop the process...")
 
     def run(self):
         """run InSAR processing"""
@@ -103,6 +110,10 @@ class InterferometryWorker(QThread):
             self.progress.emit(15)
             self.log_message.emit("Setting geometry for main CEOS...")
             QApplication.processEvents()
+            if self.is_cancelled:
+                self.log_message.emit("Processing cancelled by user")
+                self.cancelled.emit()
+                return
             main_ceos.set_geometory(plot=False, output_json_path=path_main_metadata_json)
 
             sub_ceos = CEOS_PALSAR2_L11_SLC(
@@ -113,6 +124,10 @@ class InterferometryWorker(QThread):
             self.progress.emit(30)
             self.log_message.emit("Setting geometry for sub CEOS...")
             QApplication.processEvents()
+            if self.is_cancelled:
+                self.log_message.emit("Processing cancelled by user")
+                self.cancelled.emit()
+                return
             sub_ceos.set_geometory(plot=False, output_json_path=path_sub_metadata_json)
 
             self.log_message.emit("Initializing Interferometry...")
@@ -125,6 +140,10 @@ class InterferometryWorker(QThread):
 
             self.log_message.emit("Starting interferometry processing...")
             QApplication.processEvents()
+            if self.is_cancelled:
+                self.log_message.emit("Processing cancelled by user")
+                self.cancelled.emit()
+                return
             self.progress.emit(50)
 
             outputs = interferometry.process(
@@ -170,11 +189,18 @@ class GeocodeWorker(QThread):
     error = pyqtSignal(str)
     log_message = pyqtSignal(str)
     progress = pyqtSignal(int)
+    cancelled = pyqtSignal()
 
     def __init__(self, inputs, logger):
         super().__init__()
         self.inputs = inputs
         self.logger = logger
+        self.is_cancelled = False
+
+    def cancel(self):
+        """Cancel the processing"""
+        self.is_cancelled = True
+        self.log_message.emit("Processing cancellation requested. Wait for a moment to stop the process...")
 
     def run(self):
         """run Geocoding processing"""
@@ -224,6 +250,10 @@ class GeocodeWorker(QThread):
 
             self.log_message.emit("Setting geometry...")
             ceos.set_geometory(plot=False, output_json_path=output_geometory_json)
+            if self.is_cancelled:
+                self.log_message.emit("Processing cancelled by user")
+                self.cancelled.emit()
+                return
             self.progress.emit(40)
 
             self.log_message.emit("Initializing Geocoder...")
@@ -241,6 +271,10 @@ class GeocodeWorker(QThread):
             signal = ceos.signal
 
             self.log_message.emit("Starting geocoding (this may take a while)...")
+            if self.is_cancelled:
+                self.log_message.emit("Processing cancelled by user")
+                self.cancelled.emit()
+                return
             self.progress.emit(65)
 
             out = geocoder.geocode(
@@ -536,6 +570,12 @@ class AzayakaPlugin:
         self.insar_worker.progress.connect(self.dlg.progressBar.setValue)
         self.insar_worker.finished.connect(self._on_insar_finished)
         self.insar_worker.error.connect(self._on_insar_error)
+        self.insar_worker.cancelled.connect(self._on_insar_cancelled)
+
+        # setup cancel functionality
+        self.dlg.cancelButton.setEnabled(True)
+        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg._cancel_callback = self.insar_worker.cancel
 
         # start the worker thread
         self.insar_worker.start()
@@ -543,6 +583,8 @@ class AzayakaPlugin:
     def _on_insar_finished(self):
         """Handler for InSAR processing completed"""
         self.dlg.progressBar.setValue(100)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
         self.dlg.processing_completed()
         self.logger.info("Processing completed!")
         QMessageBox.information(self.dlg, "Success", "InSAR processing completed successfully!")
@@ -551,9 +593,21 @@ class AzayakaPlugin:
     def _on_insar_error(self, error_msg):
         """Handler for InSAR processing error"""
         self.dlg.progressBar.setValue(0)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"InSAR processing failed:\n{error_msg}")
         self.dlg.processing_completed()
+        QApplication.processEvents()
+
+    def _on_insar_cancelled(self):
+        """Handler for InSAR processing cancelled"""
+        self.dlg.progressBar.setValue(0)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.clear_log()
+        self.dlg.processing_completed()
+        self.logger.info("Processing cancelled by user")
         QApplication.processEvents()
 
     def _run_geocoding_processing_async(self):
@@ -584,12 +638,18 @@ class AzayakaPlugin:
         
         # create the worker thread
         self.geocode_worker = GeocodeWorker(inputs, self.logger)
-        
+
         # connect the signals
         self.geocode_worker.log_message.connect(lambda msg: self.logger.info(msg))
         self.geocode_worker.progress.connect(self.dlg.progressBar.setValue)
         self.geocode_worker.finished.connect(self._on_geocoding_finished)
         self.geocode_worker.error.connect(self._on_geocoding_error)
+        self.geocode_worker.cancelled.connect(self._on_geocoding_cancelled)
+
+        # setup cancel functionality
+        self.dlg.cancelButton.setEnabled(True)
+        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg._cancel_callback = self.geocode_worker.cancel
         
         # start the worker thread
         self.geocode_worker.start()
@@ -597,6 +657,8 @@ class AzayakaPlugin:
     def _on_geocoding_finished(self):
         """Handler for Geocoding processing completed"""
         self.dlg.progressBar.setValue(100)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
         self.dlg.processing_completed()
         self.logger.info("Processing completed. Dialog will remain open.")
         QMessageBox.information(self.dlg, "Success", "Geocoding processing completed successfully!")
@@ -605,7 +667,19 @@ class AzayakaPlugin:
     def _on_geocoding_error(self, error_msg):
         """Handler for Geocoding processing error"""
         self.dlg.progressBar.setValue(0)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"Geocoding processing failed:\n{error_msg}")
         self.dlg.processing_completed()
+        QApplication.processEvents()
+
+    def _on_geocoding_cancelled(self):
+        """Handler for Geocoding processing cancelled"""
+        self.dlg.progressBar.setValue(0)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.cancelButton.setText("The process stopped")
+        self.dlg.clear_log()
+        self.dlg.processing_completed()
+        self.logger.info("Processing cancelled by user")
         QApplication.processEvents()

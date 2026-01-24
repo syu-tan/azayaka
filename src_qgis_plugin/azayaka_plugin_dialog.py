@@ -22,6 +22,8 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # Initialize the progress bar
         self.progressBar.setValue(0)
         self.progressBar.setFormat("%p%")
+        # Initialize the cancel button
+        self.cancelButton.clicked.connect(self._on_cancel_clicked)
 
     def accept(self):
         """Handler for OK button press
@@ -38,6 +40,8 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
         # disable the Cancel button (the button is disabled during processing)
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setEnabled(False)
+        # disable the cancel button initially (will be enabled when worker starts)
+        self.cancelButton.setEnabled(False)
         # update the UI
         QApplication.processEvents()
 
@@ -52,6 +56,9 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
         # re-enable the Cancel button (the button is enabled after processing)
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setEnabled(True)
+        # disable the cancel button
+        self.cancelButton.setEnabled(False)
+        self.cancelButton.setText("The process stopped")
         # change the text of the OK button (the text is changed after processing)
         # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText("閉じる")
 
@@ -84,3 +91,11 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
     def get_current_tab_index(self):
         """get the index of the currently selected tab"""
         return self.tabWidget.currentIndex()
+
+    def _on_cancel_clicked(self):
+        """Handler for cancel button press"""
+        self.cancelButton.setEnabled(False)
+        self.cancelButton.setText("The process stopped")
+        # Emit cancel signal to the worker (will be connected in the plugin class)
+        if hasattr(self, '_cancel_callback') and self._cancel_callback:
+            self._cancel_callback()
