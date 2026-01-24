@@ -569,19 +569,30 @@ class Geocode(object):
             method="cubic",
             fill_value=np.nanmean(valid_values),
         )
+        
+        del valid_points, points, grid_points, azimuth_grid, range_grid
+        gc.collect()
+        
         coarse_dem = coarse_dem_flat.reshape(coarse_height, coarse_width)
         coarse_dem = cls._fill_nan_values_simple(coarse_dem, np.nanmean(valid_values))
         coarse_dem_smooth = gaussian_filter(coarse_dem, sigma=1.0)
+        
+        del coarse_dem_flat, coarse_dem, valid_values
+        gc.collect()
 
         try:
             kx = min(3, coarse_height - 1)
             ky = min(3, coarse_width - 1)
             interp_func = RectBivariateSpline(
-                azimuth_coarse, range_coarse, coarse_dem_smooth, kx=kx, ky=ky, s=0
+                 azimuth_coarse, range_coarse, coarse_dem_smooth, kx=kx, ky=ky, s=0
             )
             azimuth_full = np.arange(height)
             range_full = np.arange(width)
             dem_interpolated = interp_func(azimuth_full, range_full)
+            
+            del interp_func, azimuth_full, range_full, coarse_dem_smooth, azimuth_coarse, range_coarse
+            gc.collect()
+            
         except Exception:
             dem_interpolated = cls._simple_interpolation(dem_sparse, valid_mask, height, width)
 
@@ -621,9 +632,14 @@ class Geocode(object):
         if not np.any(valid_mask):
             raise ValueError("No overlap between radar coordinates and DEM")
 
+        gc.collect()
+        
         dem_radar_smooth = cls._interpolate_with_spline_fixed(
             dem_radar_coordinate, valid_mask, num_aperture_sample, num_pixel
         )
+        
+        del dem_radar_coordinate
+        gc.collect()
 
         return dem_radar_smooth, valid_mask
 
@@ -880,6 +896,8 @@ class Geocode(object):
             self.sar.NUM_APERTURE_SAMPLE,
             self.sar.NUM_PIXEL,
         )
+        
+        gc.collect()
 
         idx_az_min = int(np.min(self.idx_azimuth))
         idx_az_max = int(np.max(self.idx_azimuth))
