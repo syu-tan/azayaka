@@ -24,26 +24,29 @@ except ImportError as e:
 
 
 class QtLogHandler(QObject, logging.Handler):
-    """Custom handler to output logs to QPlainTextEdit"""
+    """Custom handler to output logs to QTextEdit"""
     log_signal = pyqtSignal(str)
-    
+
     def __init__(self, text_widget):
         QObject.__init__(self)
         logging.Handler.__init__(self)
         self.text_widget = text_widget
         self.log_signal.connect(self._append_text)
-    
+
     def emit(self, record):
         """output the log record to the text area"""
         msg = self.format(record)
+        # Check if this is a cancellation message and color it red
+        if "Processing cancellation requested" in msg:
+            msg = f'<span style="color: red;">{msg}</span>'
         self.log_signal.emit(msg)
         # update the UI
         QApplication.processEvents()
-    
+
     def _append_text(self, text):
         """append text to the text area (thread-safe)"""
         if self.text_widget:
-            self.text_widget.appendPlainText(text)
+            self.text_widget.append(text)
             # auto scroll
             scrollbar = self.text_widget.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
@@ -200,7 +203,7 @@ class GeocodeWorker(QThread):
     def cancel(self):
         """Cancel the processing"""
         self.is_cancelled = True
-        self.log_message.emit("Processing cancellation requested. Wait for a moment to stop the process...")
+        self.log_message.emit("Processing cancellation requested. \nWait for a moment to completely stop the process. \nSome processes may not be stopped immediately.")
 
     def run(self):
         """run Geocoding processing"""
