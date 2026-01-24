@@ -329,13 +329,13 @@ class AzayakaPlugin:
             
             signal = ceos.signal
             
-            # out = geocoder.geocode(
-            #     signal=signal,
-            #     # phase=phase,
-            #     output_intensity_path=out_intensity,
-            #     output_phase_path=out_phase,
-            #     register=True,
-            # )
+            out = geocoder.geocode(
+                signal=signal,
+                # phase=phase,
+                output_intensity_path=out_intensity,
+                output_phase_path=out_phase,
+                register=True,
+            )
             
             self.logger.info("Geocoding processing completed successfully")
             message = "Geocoding processing completed successfully!\n\nOutput files:\n"
