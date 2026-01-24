@@ -35,11 +35,11 @@
      <x>20</x>
      <y>40</y>
      <width>631</width>
-     <height>261</height>
+     <height>311</height>
     </rect>
    </property>
    <property name="currentIndex">
-    <number>2</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="InSARTab">
     <attribute name="title">
