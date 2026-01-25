@@ -485,7 +485,6 @@ class AzayakaPlugin:
 
         self.first_start = True
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -493,7 +492,6 @@ class AzayakaPlugin:
                 '&Azayaka',
                 action)
             self.iface.removeToolBarIcon(action)
-
 
     def run(self):
         """Run method that performs all the real work"""
