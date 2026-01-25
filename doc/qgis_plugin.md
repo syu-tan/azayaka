@@ -338,3 +338,4 @@ pip install -r 'path/to/requirements.txt'
 - [QGISプラグインをつくってみよう - エアロトヨタ](https://www.aerotoyota.co.jp/fun/column/52/)
 - [PyQtで重い処理をする時に使うべきマルチスレッドとプログレスバーの実装](https://qiita.com/phyblas/items/37ef1b77decbc48c5fa5#%E3%83%97%E3%83%AD%E3%82%B0%E3%83%AC%E3%82%B9%E3%83%90%E3%83%BC)
 - [PySide超入門【第23回】QThreadで学ぶマルチスレッド処理と非同期プログラミング入門](https://www.useful-python.com/pyside23-qthread/)
+- [PySide超入門【第15回】通知とメッセージ表示！QStatusBarとQMessageBoxの徹底解説](https://www.useful-python.com/pyside15-qstatusbar-qmessagebox/)
