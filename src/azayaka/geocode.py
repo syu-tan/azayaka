@@ -547,7 +547,7 @@ class Geocode(object):
     @classmethod
     def _interpolate_with_spline_fixed(cls, dem_sparse, valid_mask, height, width):
         valid_points = np.where(valid_mask)
-        valid_values = dem_sparse[valid_mask]# .astype(np.float32)
+        valid_values = dem_sparse[valid_mask].astype(np.float32)
         if len(valid_values) == 0:
             return dem_sparse
 
