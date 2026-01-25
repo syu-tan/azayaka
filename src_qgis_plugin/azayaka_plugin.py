@@ -3,6 +3,7 @@ import os
 import gc
 import sys
 import logging
+import glob
 from datetime import datetime
 
 # qgis
@@ -299,6 +300,9 @@ class GeocodeWorker(QThread):
 
 class AzayakaPlugin:
     """QGIS Plugin Implementation."""
+    
+    # Maximum number of log files to keep
+    MAX_LOG_FILES = 10
 
     def __init__(self, iface):
         """Constructor.
@@ -331,6 +335,32 @@ class AzayakaPlugin:
         if sys.stderr is None:
             sys.stderr = open(os.devnull, 'w', encoding='utf-8')
     
+    def _cleanup_old_logs(self, log_dir):
+        """Remove old log files if the number exceeds MAX_LOG_FILES
+        
+        :param log_dir: Directory containing log files
+        :type log_dir: str
+        """
+        # Get all log files matching the pattern
+        log_pattern = f"{log_dir}/azayaka_plugin_*.log"
+        log_files = glob.glob(log_pattern)
+        
+        # If the number of log files exceeds MAX_LOG_FILES, remove the oldest ones
+        if len(log_files) > self.MAX_LOG_FILES:
+            # Sort by modification time (oldest first)
+            log_files.sort(key=lambda x: os.path.getmtime(x))
+            
+            # Calculate how many files to delete
+            files_to_delete = len(log_files) - self.MAX_LOG_FILES
+            
+            # Delete the oldest files
+            for i in range(files_to_delete):
+                try:
+                    os.remove(log_files[i])
+                except OSError as e:
+                    # Log error if file deletion fails, but continue with other files
+                    print(f"Failed to delete log file {log_files[i]}: {e}")
+    
     def _setup_logger(self, dialog=None):
         """Setup logger with file handler and optional dialog handler"""
         logger = logging.getLogger('AzayakaPlugin')
@@ -346,6 +376,9 @@ class AzayakaPlugin:
         plugin_dir = os.path.dirname(__file__)
         log_dir = os.path.join(plugin_dir, 'log')
         os.makedirs(log_dir, exist_ok=True)
+        
+        # Clean up old log files before creating a new one
+        self._cleanup_old_logs(log_dir)
         
         # Create log file with timestamp
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
