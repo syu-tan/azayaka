@@ -64,11 +64,10 @@ class InterferometryWorker(QThread):
         super().__init__()
         self.inputs = inputs
         self.logger = logger
-        self.is_cancelled = False
 
     def cancel(self):
         """Cancel the processing"""
-        self.is_cancelled = True
+        self.requestInterruption()
         self.log_message.emit("Processing cancellation requested. \nWait for a moment to completely stop the process. \nSome processes may not be stopped immediately.")
 
     def run(self):
@@ -113,7 +112,7 @@ class InterferometryWorker(QThread):
             self.progress.emit(15)
             self.log_message.emit("Setting geometry for main CEOS...")
             QApplication.processEvents()
-            if self.is_cancelled:
+            if self.isInterruptionRequested():
                 self.log_message.emit("Processing cancelled by user")
                 self.cancelled.emit()
                 return
@@ -127,7 +126,7 @@ class InterferometryWorker(QThread):
             self.progress.emit(30)
             self.log_message.emit("Setting geometry for sub CEOS...")
             QApplication.processEvents()
-            if self.is_cancelled:
+            if self.isInterruptionRequested():
                 self.log_message.emit("Processing cancelled by user")
                 self.cancelled.emit()
                 return
@@ -143,7 +142,7 @@ class InterferometryWorker(QThread):
 
             self.log_message.emit("Starting interferometry processing...")
             QApplication.processEvents()
-            if self.is_cancelled:
+            if self.isInterruptionRequested():
                 self.log_message.emit("Processing cancelled by user")
                 self.cancelled.emit()
                 return
@@ -198,11 +197,10 @@ class GeocodeWorker(QThread):
         super().__init__()
         self.inputs = inputs
         self.logger = logger
-        self.is_cancelled = False
 
     def cancel(self):
         """Cancel the processing"""
-        self.is_cancelled = True
+        self.requestInterruption()
         self.log_message.emit("Processing cancellation requested. \nWait for a moment to completely stop the process. \nSome processes may not be stopped immediately.")
 
     def run(self):
@@ -253,7 +251,7 @@ class GeocodeWorker(QThread):
 
             self.log_message.emit("Setting geometry...")
             ceos.set_geometory(plot=False, output_json_path=output_geometory_json)
-            if self.is_cancelled:
+            if self.isInterruptionRequested():
                 self.log_message.emit("Processing cancelled by user")
                 self.cancelled.emit()
                 return
@@ -274,7 +272,7 @@ class GeocodeWorker(QThread):
             signal = ceos.signal
 
             self.log_message.emit("Starting geocoding (this may take a while)...")
-            if self.is_cancelled:
+            if self.isInterruptionRequested():
                 self.log_message.emit("Processing cancelled by user")
                 self.cancelled.emit()
                 return
@@ -611,6 +609,9 @@ class AzayakaPlugin:
         self.dlg.clear_log()
         self.dlg.processing_completed()
         self.logger.info("Processing cancelled by user")
+        # Wait for thread to finish
+        if hasattr(self, 'insar_worker') and self.insar_worker.isRunning():
+            self.insar_worker.wait()
         QApplication.processEvents()
 
     def _run_geocoding_processing_async(self):
@@ -685,4 +686,7 @@ class AzayakaPlugin:
         self.dlg.clear_log()
         self.dlg.processing_completed()
         self.logger.info("Processing cancelled by user")
+        # Wait for thread to finish
+        if hasattr(self, 'geocode_worker') and self.geocode_worker.isRunning():
+            self.geocode_worker.wait()
         QApplication.processEvents()
