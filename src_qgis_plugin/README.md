@@ -1,36 +1,37 @@
-# 事前準備&tips
+# Azayaka QGIS Plugin
 
-## プラグイン実行に必要なライブラリをQGIS環境にインストールする方法
+## Overview
 
-- OSgeo4W shellを管理者権限で開き、以下のコマンドを実行
-```
-pip install -r 'path/to/requirements.txt'
-```
-※'path/to/requirements.txt'：ローカルのazayaka\requirements.txtへの絶対パス
+Azayaka is a QGIS plugin for processing Synthetic Aperture Radar (SAR) data. It supports JAXA CEOS format SAR data and provides tools for InSAR (Interferometric SAR) analysis and geocoding.
 
-## プラグインのアイコン画像変更方法
+## Key Features
 
-### OSgeo4W shellを開き、アイコン画像を配置したローカルのdirまで移動
-```
-cd 'path/to/azayaka_plugin'
-```
+- **InSAR Processing**: Perform InSAR analysis using two SAR images to detect ground deformation and other phenomena.
+- **Geocoding**: Project SAR data to geographic coordinate systems and export as GeoTIFF files.
 
-※windowsではicon.pngは C:\Users\hogehoge\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\azayaka_plugin 配下に存在
+## Requirements
 
-### その後以下のコマンドを実行（コンパイル）し、リロード（リロードは後述）
-```
-pyrcc5 -o resources.py resources.qrc
-```
+- QGIS 3.0+
+- Python 3.11+
 
-## 開発側でのQGISの動作確認
+## Installation
 
-開発中に毎回pip installするのが手間な場合、ファイルを手動で配置する事も可能
+1. install required libraries for running azayaka-plugin in your QGIS environment
+    - download azayaka\requirements.txt in your download directory
+    - Open the OSGeo4W shell as an administrator and run the following command:
+        - ```pip install -r 'path/to/requirements.txt'```
+where 'path/to/requirements.txt' means the absolute path to azayaka\requirements.txt
 
-- 1. azayakaのsrcファイル(pip installの対象ファイル群)を以下に配置
-    - C:\Users\hogehoge\AppData\Roaming\Python\Python312\site-packages\azayaka
+2. install "Azayaka" in the following two ways:
+    - case-1(easy): Search for "Azayaka" in the QGIS Plugin Manager and install.
+    - case-2: open OSGeo4W shell and run ```pip install azayaka```
 
-- 2. azayaka\src_qgis_plugin配下のファイルを以下に配置
-    - C:\Users\hogehoge\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\azayaka_plugin
+## Usage
 
-- 3. プラグインのリロード
-    QGISのプラグイン'Plugin Reloader'を使用するとQGISを再起動しなくて良いため、効率的
+1. In QGIS, navigate to the menu and select "Plugins" → "Azayaka Plugin".
+2. In the dialog, choose the desired processing tab (InSAR or Geocoding).
+3. Set the required input parameters and click the OK button.
+4. When the process is complete, results will be saved in your specified output directory.
+
+## example usage on YouTube
+coming soon
