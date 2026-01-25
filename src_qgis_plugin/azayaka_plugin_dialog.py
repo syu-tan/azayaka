@@ -3,7 +3,6 @@ import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QApplication
 
 
@@ -59,8 +58,6 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # disable the cancel button
         self.cancelButton.setEnabled(False)
         self.cancelButton.setText("Stop")
-        # change the text of the OK button (the text is changed after processing)
-        # self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText("閉じる")
 
     def get_insar_inputs(self):
         """get the input values of the InSAR-tab"""
