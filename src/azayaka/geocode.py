@@ -558,6 +558,9 @@ class Geocode(object):
         azimuth_coarse = np.linspace(0, height - 1, coarse_height)
         range_coarse = np.linspace(0, width - 1, coarse_width)
         azimuth_grid, range_grid = np.meshgrid(azimuth_coarse, range_coarse, indexing="ij")
+        
+        del azimuth_coarse, range_coarse
+        gc.collect()
 
         points = np.column_stack((valid_points[0], valid_points[1]))
         grid_points = np.column_stack((azimuth_grid.ravel(), range_grid.ravel()))
@@ -959,7 +962,7 @@ class Geocode(object):
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),
             )
             
-        del intensity_coarse_reg, dem_radar_smooth_cropped
+        del intensity_coarse_reg
         gc.collect()
 
         intensity = np.abs(signal)[top_az:bot_az, left_rg:right_rg]
