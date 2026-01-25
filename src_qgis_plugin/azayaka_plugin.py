@@ -663,7 +663,7 @@ class AzayakaPlugin:
         self.dlg.cancelButton.setEnabled(False)
         self.dlg.cancelButton.setText("Stop")
         self.dlg.processing_completed()
-        self.logger.info("Processing completed. Dialog will remain open.")
+        self.logger.info("Processing completed!")
         QMessageBox.information(self.dlg, "Success", "Geocoding processing completed successfully!")
         QApplication.processEvents()
     
