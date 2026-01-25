@@ -547,7 +547,7 @@ class Geocode(object):
     @classmethod
     def _interpolate_with_spline_fixed(cls, dem_sparse, valid_mask, height, width):
         valid_points = np.where(valid_mask)
-        valid_values = dem_sparse[valid_mask]
+        valid_values = dem_sparse[valid_mask]# .astype(np.float32)
         if len(valid_values) == 0:
             return dem_sparse
 
@@ -897,6 +897,7 @@ class Geocode(object):
             self.sar.NUM_PIXEL,
         )
         
+        del _
         gc.collect()
 
         idx_az_min = int(np.min(self.idx_azimuth))
@@ -913,6 +914,9 @@ class Geocode(object):
             raise ValueError("No overlap between radar coordinates and DEM after cropping")
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
+        
+        del dem_radar_smooth
+        gc.collect()
 
         po_shift_dem_range = 0.0
         po_shift_dem_azimuth = 0.0
@@ -954,6 +958,9 @@ class Geocode(object):
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),
             )
+            
+        del intensity_coarse_reg, dem_radar_smooth_cropped
+        gc.collect()
 
         intensity = np.abs(signal)[top_az:bot_az, left_rg:right_rg]
         if register:
