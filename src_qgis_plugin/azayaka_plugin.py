@@ -69,7 +69,7 @@ class InterferometryWorker(QThread):
     def cancel(self):
         """Cancel the processing"""
         self.is_cancelled = True
-        self.log_message.emit("Processing cancellation requested. Wait for a moment to stop the process...")
+        self.log_message.emit("Processing cancellation requested. \nWait for a moment to completely stop the process. \nSome processes may not be stopped immediately.")
 
     def run(self):
         """run InSAR processing"""
