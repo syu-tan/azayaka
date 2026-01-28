@@ -7,8 +7,8 @@ name=Azayaka
 qgisMinimumVersion=3.0
 description=A plugin that processes Synthetic Aparture Rader data.
 version=0.1
-author=xxx
-email=xxx
+author=Yasui Shunsuke, Yutaka Yamamoto
+email=syuchimu@gmail.com, yamamo10yu1995@gmail.com
 
 about=Azayaka is a Python package for SAR (Synthetic Aperture Radar) processing and a simple InSAR Project. It focuses on geometry calculations for JAXA CEOS and SICD formats.
 
