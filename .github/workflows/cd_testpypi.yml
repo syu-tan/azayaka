@@ -2,7 +2,7 @@ name: CD TestPyPI
 
 on:
   push:
-    tags: ["v*", main]
+    tags: ["v*", main, feature/pypi]
   workflow_dispatch:
 
 permissions:

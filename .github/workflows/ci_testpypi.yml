@@ -2,7 +2,7 @@ name: CI TestPyPI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, feature/pypi]
     tags: ["v*"]
   pull_request:
   workflow_call:
