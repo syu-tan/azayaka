@@ -124,6 +124,8 @@ class CEOS_PALSAR_L10_RAW(object):
     FLOAT64 = 64
     
     NUM_VELOCITY_CALC_SPAN_COUNT: int = 4
+    NUM_TMP_SAMPLE: int = 36  # for satellite position interpolation
+    NUM_VELOCITY_CALC_SAMPLE: int = 4  # for satellite velocity interpolation
     
     @classmethod
     def __init__(self,
@@ -231,6 +233,8 @@ class CEOS_PALSAR_L10_RAW(object):
         f.seek(self.NUM_SAR_DISCRIPTOR_RECORD)
         print('Num of Range: ', self.NUM_PIXEL, 'Num of Azimuth Line: ', self.NUM_SIGNAL_RECORD)
         
+        self.signal = np.zeros((self.NUM_SIGNAL_RECORD, self.NUM_PIXEL), dtype=np.complex64)
+        
         for i in tqdm(range(self.NUM_SIGNAL_RECORD)):
             if i == 0:
                 print(f'{"="*10} Start Time {"="*10}');
@@ -267,17 +271,17 @@ class CEOS_PALSAR_L10_RAW(object):
             if i >= self.NUM_SIGNAL_RECORD - 2:
                 # single processing
                 for j in range(self.NUM_PIXEL):
-                    _ = f.read(self.BYTE1)
-                    _ = f.read(self.BYTE1)
-                    # hh_real = int.from_bytes(byte_hh_r, 'big') 
-                    # hh_imag = int.from_bytes(byte_hh_i, 'big')
-                    # signal[i, j] = hh_real + hh_imag * 1j
+                    byte_hh_r = f.read(self.BYTE1)
+                    byte_hh_i = f.read(self.BYTE1)
+                    hh_real = int.from_bytes(byte_hh_r, 'big') 
+                    hh_imag = int.from_bytes(byte_hh_i, 'big')
+                    self.signal[i, j] = hh_real + hh_imag * 1j
             else:
                 # paralell processing
-                _ = f.read(self.NUM_PIXEL * 2)
-                # ri = np.frombuffer(byte_ri, dtype=np.uint8)
-                # ln = int(len(ri)/2)
-                # signal[i, :ln] = ri[0::2] + ri[1::2] * 1j
+                byte_ri = f.read(self.NUM_PIXEL * 2)
+                ri = np.frombuffer(byte_ri, dtype=np.uint8)
+                ln = int(len(ri) / 2)
+                self.signal[i,:ln] = ri[0::2] + ri[1::2] * 1j
                 
             # right offset
             _ = f.read(self.NUM_BLANK_PIXEL * 2)
@@ -653,12 +657,12 @@ class CEOS_PALSAR_L10_RAW(object):
         
         # スケール調整
         self.FREQ_AD_SAMPLE = self.sampling_frequency * 1e6
-        self.FREQ_PULSE_REPETATION = self.prf * 1e-3
+        self.FREQ_PULSE_REPETITION = self.prf * 1e-3
         self.TIME_PLUSE_DURATION = self.chirp_length * 1e-9
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
         
-    def set_geometory(self, plot=False, output_json_path: str=None):
+    def set_geometory(self, plot=False, output_json_path: str=None, PATH_OUTPUT: str='./output'):
         """ 観測ジオメトリの設定 """
         
         self.TIME_SHIFT = 0.0  # [sec] 時刻シフト量
@@ -677,9 +681,9 @@ class CEOS_PALSAR_L10_RAW(object):
         # # 観測時間
         self.TIME_OBS_START_ = self.TIME_OBS_START_DAY + (self.TIME_OBS_START_MSEC / self.DIGIT4 + self.TIME_SHIFT) / self.TIME_DAY_SEC
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + \
-            (self.NUM_APERTURE_SAMPLE * .0) / self.FREQ_PULSE_REPETATION
+            (self.NUM_APERTURE_SAMPLE * .0) / self.FREQ_PULSE_REPETITION
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + \
-            (self.NUM_APERTURE_SAMPLE * 1.0) / self.FREQ_PULSE_REPETATION
+            (self.NUM_APERTURE_SAMPLE * 1.0) / self.FREQ_PULSE_REPETITION
 
         print("観測開始時刻 (秒):", self.TIME_OBS_START_SEC)
         print("観測終了時刻 (秒):", self.TIME_OBS_END_SEC)
@@ -730,7 +734,7 @@ class CEOS_PALSAR_L10_RAW(object):
         self.DIS_RANGE_SLANT = self.SOL / (2. * self.FREQ_AD_SAMPLE)  # DELTA
         self.DIS_FAR_RANGE = self.DIS_NEAR_RANGE + (self.NUM_PIXEL - 1) * self.DIS_RANGE_SLANT
         # 電離層遅延補正
-        self.dis_ionosphere_delay = (TIME_IONSPHERE_DELAY * 1e-3) * self.SOL
+        # self.dis_ionosphere_delay = (TIME_IONSPHERE_DELAY * 1e-3) * self.SOL
         self.dis_ionosphere_delay = 0  # 電離層遅延補正を無効化
         print(f"電離層遅延補正距離: {self.dis_ionosphere_delay:.2f} m")
         self.DIS_NEAR_RANGE -= self.dis_ionosphere_delay
@@ -753,13 +757,305 @@ class CEOS_PALSAR_L10_RAW(object):
         print(f"平均衛星高度: {np.mean(self.HEIGHT_SAT):.2f} m")
         if output_json_path:
             _write_observation_json(self, output_json_path)
+            
+    def execute_focus(self, ground_velocity=None, PATH_OUTPUT: str='./output'):
+        """
+        フォーカシングの実行（チャープスケーリング法）。
 
+        SAR の生データに対してチャープスケーリング（Chirp Scaling, CS）アルゴリズムを適用し、
+        レンジ方向とアジマス方向の補正・圧縮を行って複素画像を生成します。
 
-import os
-import numpy as np
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
+        処理の流れ（概要）:
+        1. 観測ジオメトリを準備し、衛星位置・速度から中心時刻の速度を推定します
+           （ground_velocity が指定されている場合はその値で上書き）。
+        2. レンジ時間軸 TAU とドップラ中心 F_DOPPLER_CENTROID を定義します。
+        3. H1: チャープスケーリングによるレンジ方向の位相補正。
+        4. H2: バルク RCMC とレンジ圧縮。
+        5. H3: 角度補正（位相誤差補正）。
+        6. H4: アジマス圧縮。
+        7. FFT/IFFT を用いて周波数領域と時刻領域を往復し、最終的な複素画像を返します。
+
+        Args:
+            ground_velocity (float | None): 地上速度の手動指定。None の場合は推定値を使用します。
+            PATH_OUTPUT (str): ジオメトリ生成時の出力先フォルダ。
+
+        Returns:
+            np.ndarray: フォーカシング後の複素画像 (azimuth x range)。
+        """
+        
+        # ensure geometry is ready
+        if not hasattr(self, "SLANT_RANGE_SAMPLE"):
+            self.set_geometory(plot=False, output_json_path=None, PATH_OUTPUT=PATH_OUTPUT)
+        if not hasattr(self, "NUM_CHIRP_EXTENSION"):
+            self.NUM_CHIRP_EXTENSION = 0
+        if not hasattr(self, "NUM_VELOCITY_CALC_SPAN_COUNT"):
+            self.NUM_VELOCITY_CALC_SPAN_COUNT = 4
+        if not hasattr(self, "NUM_TMP_SAMPLE"):
+            self.NUM_TMP_SAMPLE = 16
+        if not hasattr(self, "NUM_VELOCITY_CALC_SAMPLE"):
+            self.NUM_VELOCITY_CALC_SAMPLE = 8
+        if not hasattr(self, "NUM_POLYNOMIAL_COEFFICIENT_DIM"):
+            self.NUM_POLYNOMIAL_COEFFICIENT_DIM = 3
+
+        # processing synthetic aperture radar data
+        f_s = self.FREQ_AD_SAMPLE  # data sampling rate
+        num_aperture = min(self.NUM_SIGNAL_RECORD, self.NUM_APERTURE_SAMPLE)
+        num_chirp_extension = int(self.NUM_CHIRP_EXTENSION)
+        F_FFT_RANGE = self.NUM_PIXEL + num_chirp_extension * 2
+
+        # range calculation
+        TIME_NEAR_RANGE = (2 * self.DIS_NEAR_RANGE / self.SOL)
+        TAU = np.linspace(
+            TIME_NEAR_RANGE,
+            TIME_NEAR_RANGE + (F_FFT_RANGE) / f_s,
+            F_FFT_RANGE,
+        )
+        F_DOPPLER_CENTROID = 0.0
+
+        # platform velocity (m/s): ground velocity at scene center
+        time_obs_start_day = np.array(self.TIME_OBS_START_DAY, dtype=np.float64)
+        time_obs_start_msec = np.array(self.TIME_OBS_START_MSEC, dtype=np.float64)
+        # time_obs_end_day = np.array(self.TIME_OBS_END_DAY, dtype=np.float64)
+        # time_obs_end_msec = np.array(self.TIME_OBS_END_MSEC, dtype=np.float64)
+
+        time_obs_start_ = time_obs_start_day + (time_obs_start_msec / self.DIGIT4 + self.TIME_SHIFT) / self.TIME_DAY_SEC
+        time_obs_start_center_sec = (
+            self.TIME_DAY_SEC * time_obs_start_
+            +0.5 * (num_aperture/2) / self.FREQ_PULSE_REPETITION
+        )
+        time_obs_end_center_sec = (
+            time_obs_start_center_sec
+            +(num_aperture/2) / self.FREQ_PULSE_REPETITION * 3
+        )
+
+        time_obs_cmd_center = (time_obs_start_center_sec + time_obs_end_center_sec) / 2.0
+        num_velocity_calc_span_count = int(self.NUM_VELOCITY_CALC_SPAN_COUNT)
+        time_delta_center_start = time_obs_cmd_center - (num_velocity_calc_span_count / 2.0)
+        time_delta_center_end = time_obs_cmd_center + (num_velocity_calc_span_count / 2.0)
+
+        p_sat_center_x = self.func_intp_orbit_x_recode_time(time_obs_cmd_center)
+        p_sat_center_y = self.func_intp_orbit_y_recode_time(time_obs_cmd_center)
+        p_sat_center_z = self.func_intp_orbit_z_recode_time(time_obs_cmd_center)
+        p_sat_center_xyz = np.sqrt(p_sat_center_x ** 2 + p_sat_center_y ** 2 + p_sat_center_z ** 2)
+
+        p_sat_delta_pre_center_x = self.func_intp_orbit_x_recode_time(time_delta_center_start)
+        p_sat_delta_pre_center_y = self.func_intp_orbit_y_recode_time(time_delta_center_start)
+        p_sat_delta_pre_center_z = self.func_intp_orbit_z_recode_time(time_delta_center_start)
+        p_sat_delta_post_center_x = self.func_intp_orbit_x_recode_time(time_delta_center_end)
+        p_sat_delta_post_center_y = self.func_intp_orbit_y_recode_time(time_delta_center_end)
+        p_sat_delta_post_center_z = self.func_intp_orbit_z_recode_time(time_delta_center_end)
+
+        v_sat_center_x = (p_sat_delta_post_center_x - p_sat_delta_pre_center_x) / num_velocity_calc_span_count
+        v_sat_center_y = (p_sat_delta_post_center_y - p_sat_delta_pre_center_y) / num_velocity_calc_span_count
+        v_sat_center_z = (p_sat_delta_post_center_z - p_sat_delta_pre_center_z) / num_velocity_calc_span_count
+        v_sat_center_xyz = np.sqrt(v_sat_center_x ** 2 + v_sat_center_y ** 2 + v_sat_center_z ** 2)
+
+        p_sat_center_xyz_3dim = np.array(
+            [p_sat_center_x, p_sat_center_y, p_sat_center_z], dtype=np.float64) / p_sat_center_xyz
+        v_sat_center_xyz_3dim = np.array(
+            [v_sat_center_x, v_sat_center_y, v_sat_center_z], dtype=np.float64) / v_sat_center_xyz
+        p_sat_cross_product_3dim = np.array([
+            p_sat_center_xyz_3dim[1] * v_sat_center_xyz_3dim[2] - p_sat_center_xyz_3dim[2] * v_sat_center_xyz_3dim[1],
+            p_sat_center_xyz_3dim[2] * v_sat_center_xyz_3dim[0] - p_sat_center_xyz_3dim[0] * v_sat_center_xyz_3dim[2],
+            p_sat_center_xyz_3dim[0] * v_sat_center_xyz_3dim[1] - p_sat_center_xyz_3dim[1] * v_sat_center_xyz_3dim[0],
+        ])
+
+        p_sat_latitude = np.arcsin(p_sat_center_z / p_sat_center_xyz)
+        sin_sat_latitude = np.sin(p_sat_latitude)
+        cos_sat_latitude = np.cos(p_sat_latitude)
+        p_earth_radius = np.divide(1.0,
+                                   np.sqrt(
+                                       cos_sat_latitude ** 2 / self.DIS_ELLIPSOID_RADIUS ** 2 + 
+                                       sin_sat_latitude ** 2 / self.DIS_ELLIPSOID_SHORT_RADIUS ** 2
+                                   ))
+
+        theta_sat_center_cosine_law = (p_sat_center_xyz ** 2 + self.DIS_NEAR_RANGE ** 2 - p_earth_radius ** 2) / (
+            2.0 * p_sat_center_xyz * self.DIS_NEAR_RANGE
+        )
+        theta_sat_center_sin = np.sin(np.arccos(theta_sat_center_cosine_law))
+
+        p_earth_radius_center_x = p_sat_center_x + self.DIS_NEAR_RANGE * (
+            -theta_sat_center_sin * p_sat_cross_product_3dim[0] - theta_sat_center_cosine_law * p_sat_center_xyz_3dim[0]
+        )
+        p_earth_radius_center_y = p_sat_center_y + self.DIS_NEAR_RANGE * (
+            -theta_sat_center_sin * p_sat_cross_product_3dim[1] - theta_sat_center_cosine_law * p_sat_center_xyz_3dim[1]
+        )
+        p_earth_radius_center_z = p_sat_center_z + self.DIS_NEAR_RANGE * (
+            -theta_sat_center_sin * p_sat_cross_product_3dim[2] - theta_sat_center_cosine_law * p_sat_center_xyz_3dim[2]
+        )
+
+        num_tmp_sample = int(self.NUM_TMP_SAMPLE)
+        idx_tmp_center = np.arange(0, num_tmp_sample, 1, dtype=np.int64) - num_tmp_sample / 2
+        time_tmp_center = idx_tmp_center * 100.0 / self.FREQ_PULSE_REPETITION * 2
+        time_tmp_start0 = time_obs_cmd_center + time_tmp_center
+        p_sat_center_tmp_x = self.func_intp_orbit_x_recode_time(time_tmp_start0)
+        p_sat_center_tmp_y = self.func_intp_orbit_y_recode_time(time_tmp_start0)
+        p_sat_center_tmp_z = self.func_intp_orbit_z_recode_time(time_tmp_start0)
+
+        p_difference_flat_slant = np.sqrt(
+            (p_earth_radius_center_x - p_sat_center_tmp_x) ** 2 + 
+            (p_earth_radius_center_y - p_sat_center_tmp_y) ** 2 + 
+            (p_earth_radius_center_z - p_sat_center_tmp_z) ** 2
+        ) - self.DIS_NEAR_RANGE
+
+        num_velocity_calc_sample = int(self.NUM_VELOCITY_CALC_SAMPLE)
+        num_polynomial_coeff_dim = int(self.NUM_POLYNOMIAL_COEFFICIENT_DIM)
+        van = np.vander(
+            time_tmp_center[:num_velocity_calc_sample],
+            (num_polynomial_coeff_dim + 1),
+            increasing=True,
+        )
+        polynominal_coeff = np.linalg.lstsq(
+            van,
+            p_difference_flat_slant[:num_velocity_calc_sample],
+            rcond=None
+        )[0]
+        v_est = np.sqrt(2.0 * self.DIS_NEAR_RANGE * polynominal_coeff[2])
+        
+        if ground_velocity is not None:
+            print(f"Indicete ground velocity: {ground_velocity:.2f} <-> [m/s] Estimated velocity: {v_est:.2f} [m/s]")
+            v = ground_velocity
+        else:
+            print(f"--> Estimated velocity: {v_est:.2f} [m/s]")
+            v = np.sqrt(2.0 * self.DIS_NEAR_RANGE * polynominal_coeff[2])
+            
+        B = -self.range_pulse_amplitude2 * self.TIME_PLUSE_DURATION
+
+        DIS_SLANT_RANGE = self.DIS_NEAR_RANGE + (F_FFT_RANGE) / f_s * self.SOL / 4
+        ALPHA = 1.0
+        f_a = np.linspace(
+            -self.FREQ_PULSE_REPETITION / 2 + F_DOPPLER_CENTROID,
+            F_DOPPLER_CENTROID + self.FREQ_PULSE_REPETITION / 2,
+            num_aperture,
+        )
+        f_r = np.linspace(-f_s / 2, f_s / 2, F_FFT_RANGE)
+        
+        # parameter check
+        print(f"Ground velocity v: {v:.2f} m/s")
+        print(f"Reference range DIS_SLANT_RANGE: {DIS_SLANT_RANGE:.2f} m")
+        print(f"Chirp bandwidth B: {B/1e6:.2f} MHz")
+        print(f"Chirp duration t_p: {self.TIME_PLUSE_DURATION*1e6:.2f} µsec")
+        print(f"Radar wavelength λ: {self.LAMBDA:.4f} m")
+        print(f"Number of aperture samples: {num_aperture}")
+        print(f"Number of range samples (with extension): {F_FFT_RANGE}")
+
+        data = np.zeros((num_aperture, F_FFT_RANGE), dtype=np.complex64)
+        data[:num_aperture, num_chirp_extension:num_chirp_extension + self.NUM_PIXEL] = self.signal[:num_aperture,:]
+
+        # azimuth fft
+        for idx_axis in tqdm(range(data.shape[1]),
+                             total=data.shape[1], desc="Azimuth FFT", leave=False):
+            data[:, idx_axis] = np.fft.fftshift(
+                np.fft.fft(np.fft.fftshift(data[:, idx_axis])))
+
+        data[num_aperture // 2,:] = 0
+
+        # chirp scaling, range scaling: H1
+        BETA = (1 - (f_a * self.LAMBDA / 2 / v) ** 2) ** 0.5
+        R = DIS_SLANT_RANGE / BETA
+        A_SCALING = (
+            (1.0 / BETA - 1.0)
+            + ((1.0 - ALPHA) * (1.0 / BETA)) / ALPHA
+        )
+        K_CHIRP_RATIO = -(B / self.TIME_PLUSE_DURATION)
+
+        K_CHIRP_RATIO_INVERSE = 1 / K_CHIRP_RATIO - (
+            2 * self.LAMBDA * DIS_SLANT_RANGE * (BETA ** 2 - 1)
+        ) / (self.SOL ** 2 * (BETA ** 3))
+        K = 1 / K_CHIRP_RATIO_INVERSE
+
+        TAU = np.asarray(TAU, dtype=np.float32)
+        H1 = np.exp(
+            -1j
+            * np.pi
+            * np.asarray(K * A_SCALING, dtype=np.float32)[:, None]
+            * (TAU[None, :] - np.asarray(2.0 * R / self.SOL, dtype=np.float32)[:, None]) ** 2
+        )
+        data = data * H1
+
+        del H1
+        gc.collect()
+
+        # range fft
+        for idx_axis in tqdm(range(data.shape[0]),
+                             total=data.shape[0], desc="Range FFT", leave=False):
+            data[idx_axis,:] = np.fft.fftshift(
+                np.fft.fft(np.fft.fftshift(data[idx_axis,:])))
+
+        # bulk rcmc, range compression: H2
+        echoes_i = int(np.asarray(A_SCALING).size)
+        f_r_sq = f_r * f_r
+
+        for i in tqdm(range(echoes_i),
+                      total=echoes_i, desc="H2 row-wise", leave=False):
+            h2_i = np.exp(
+                -1j * np.pi
+                * (1.0 / (K[i] * (1.0 + A_SCALING[i])))
+                * f_r_sq
+            ) * np.exp(
+                1j
+                * 4.0
+                * np.pi
+                * DIS_SLANT_RANGE
+                / self.SOL
+                * (f_r * (1.0 / BETA[i] - 1.0))
+            )
+            data[i,:] = data[i,:] * h2_i
+
+        del h2_i, f_r_sq
+        gc.collect()
+
+        # range ifft
+        for idx_axis in tqdm(range(data.shape[0]),
+                             total=data.shape[0], desc="Range IFFT", leave=False):
+            data[idx_axis,:] = np.fft.fftshift(
+                np.fft.ifft(np.fft.fftshift(data[idx_axis,:])))
+
+        # angle correction: H3
+        R_ZERO = 0.5 * self.SOL * np.asarray(TAU)
+        R_ZERO_DELTA_SQ = (R_ZERO - DIS_SLANT_RANGE) ** 2
+
+        for i in tqdm(range(echoes_i),
+                      total=echoes_i, desc="H3 row-wise", leave=False):
+            dphi_i = 4.0 * np.pi * (
+                K[i]
+                * A_SCALING[i]
+                * (1.0 / BETA[i]) ** 2
+                / (self.SOL ** 2 * (1.0 + A_SCALING[i]))
+            ) * R_ZERO_DELTA_SQ
+            h3_i = np.exp(1j * dphi_i)
+            data[i,:] = data[i,:] * h3_i
+
+        del h3_i, R_ZERO_DELTA_SQ
+        gc.collect()
+
+        # azimuth compression: H4
+        R_ZERO = np.asarray(R_ZERO, dtype=np.float64)
+        ALPHAS = np.asarray(ALPHA, dtype=np.float64)
+
+        for i in tqdm(range(echoes_i),
+                      total=echoes_i, desc="H4 row-wise", leave=False):
+            alpha_i = (ALPHAS if ALPHAS.ndim == 0 else ALPHAS[i])
+            r_0_scl_i = DIS_SLANT_RANGE + (R_ZERO - DIS_SLANT_RANGE) / alpha_i
+            h4_i = np.exp(
+                1j
+                * 4.0
+                * np.pi
+                / self.LAMBDA
+                * r_0_scl_i
+                * (BETA[i] - 1.0)
+            )
+            data[i,:] = data[i,:] * h4_i
+
+        del h4_i, R_ZERO, ALPHAS
+        gc.collect()
+
+        # azimuth ifft
+        for idx_axis in tqdm(range(data.shape[1]),
+                             total=data.shape[1], desc="Azimuth IFFT", leave=False):
+            data[:, idx_axis] = np.fft.fftshift(
+                np.fft.ifft(np.fft.fftshift(data[:, idx_axis])))
+        return data[:, num_chirp_extension:num_chirp_extension + self.NUM_PIXEL]
 
 # 外部で定義されている想定
 # PATH_OUTPUT = "..."
@@ -1488,7 +1784,7 @@ class CEOS_PALSAR_L11_SLC(object):
         self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full sample
 
         self.FREQ_AD_SAMPLE = self.sampling_frequency_mhz * 1e6
-        self.FREQ_PULSE_REPETATION = self.prf * 1e-3
+        self.FREQ_PULSE_REPETITION = self.prf * 1e-3
         self.TIME_PLUSE_DURATION = self.chirp_length * 1e-9
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
@@ -1525,10 +1821,10 @@ class CEOS_PALSAR_L11_SLC(object):
         ) / self.TIME_DAY_SEC
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 0.0
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 1.0
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
 
         print("観測開始時刻 (秒):", self.TIME_OBS_START_SEC)
         print("観測終了時刻 (秒):", self.TIME_OBS_END_SEC)
@@ -2300,7 +2596,7 @@ class CEOS_PALSAR2_L11_SLC(object):
         self.FREQ_AD_SAMPLE = self.sampling_frequency_mhz * 1e6
         # Equation - Condition: No 2.7
         # # PRF := PRF(mHz) * 10^-3
-        self.FREQ_PULSE_REPETATION = self.prf_mhz * 1e-3
+        self.FREQ_PULSE_REPETITION = self.prf_mhz * 1e-3
         # Equation - Condition: No 2.8
         # # Pulse Duration := T_chirp(nsec) * 10^-9
         self.TIME_PLUSE_DURATION = self.chirp_length * 1e-9
@@ -2356,10 +2652,10 @@ class CEOS_PALSAR2_L11_SLC(object):
         ) / self.TIME_DAY_SEC
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 0.
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 1.
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
 
         print("観測開始時刻 (秒):", self.TIME_OBS_START_SEC)
         print("観測終了時刻 (秒):", self.TIME_OBS_END_SEC)
@@ -3211,7 +3507,7 @@ class CEOS_PALSAR3_L11_SLC(object):
         self.NUM_APERTURE_SAMPLE = self.NUM_SIGNAL_RECORD  # default full azimuth
 
         self.FREQ_AD_SAMPLE = self.sampling_frequency_mhz * 1e6
-        self.FREQ_PULSE_REPETATION = self.prf_mhz * 1e-3
+        self.FREQ_PULSE_REPETITION = self.prf_mhz * 1e-3
         self.TIME_PLUSE_DURATION = self.chirp_length * 1e-9
         self.DIS_ELLIPSOID_RADIUS = self.ellipsoid_radius * 1e3
         self.DIS_ELLIPSOID_SHORT_RADIUS = self.ellipsoid_short_radius * 1e3
@@ -3263,12 +3559,12 @@ class CEOS_PALSAR3_L11_SLC(object):
         # # Obs Start Time := day_sec * T_obs + (N * 0) / PRF
         self.TIME_OBS_START_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 0.0
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
         # Equation - Condition: No 2.14
         # # Obs End Time := day_sec * T_obs + (N * 1) / PRF
         self.TIME_OBS_END_SEC = self.TIME_DAY_SEC * self.TIME_OBS_START_ + (
             self.NUM_APERTURE_SAMPLE * 1.0
-        ) / self.FREQ_PULSE_REPETATION
+        ) / self.FREQ_PULSE_REPETITION
 
         print("観測開始時刻 (秒):", self.TIME_OBS_START_SEC)
         print("観測終了時刻 (秒):", self.TIME_OBS_END_SEC)
