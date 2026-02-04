@@ -798,7 +798,6 @@ class CEOS_PALSAR_L10_RAW(object):
             self.NUM_POLYNOMIAL_COEFFICIENT_DIM = 3
 
         # processing synthetic aperture radar data
-        f_s = self.FREQ_AD_SAMPLE  # data sampling rate
         num_aperture = min(self.NUM_SIGNAL_RECORD, self.NUM_APERTURE_SAMPLE)
         num_chirp_extension = int(self.NUM_CHIRP_EXTENSION)
         F_FFT_RANGE = self.NUM_PIXEL + num_chirp_extension * 2
@@ -807,7 +806,7 @@ class CEOS_PALSAR_L10_RAW(object):
         TIME_NEAR_RANGE = (2 * self.DIS_NEAR_RANGE / self.SOL)
         TAU = np.linspace(
             TIME_NEAR_RANGE,
-            TIME_NEAR_RANGE + (F_FFT_RANGE) / f_s,
+            TIME_NEAR_RANGE + (F_FFT_RANGE) / self.FREQ_AD_SAMPLE,
             F_FFT_RANGE,
         )
         F_DOPPLER_CENTROID = 0.0
@@ -921,14 +920,21 @@ class CEOS_PALSAR_L10_RAW(object):
             
         B = -self.range_pulse_amplitude2 * self.TIME_PLUSE_DURATION
 
-        DIS_SLANT_RANGE = self.DIS_NEAR_RANGE + (F_FFT_RANGE) / f_s * self.SOL / 4
+        DIS_SLANT_RANGE = (
+            self.DIS_NEAR_RANGE
+            + (F_FFT_RANGE) / self.FREQ_AD_SAMPLE * self.SOL / 4
+        )
         ALPHA = 1.0
         f_a = np.linspace(
             -self.FREQ_PULSE_REPETITION / 2 + F_DOPPLER_CENTROID,
             F_DOPPLER_CENTROID + self.FREQ_PULSE_REPETITION / 2,
             num_aperture,
         )
-        f_r = np.linspace(-f_s / 2, f_s / 2, F_FFT_RANGE)
+        f_r = np.linspace(
+            -self.FREQ_AD_SAMPLE / 2,
+            self.FREQ_AD_SAMPLE / 2,
+            F_FFT_RANGE,
+        )
         
         # parameter check
         print(f"Ground velocity v: {v:.2f} m/s")
@@ -1036,13 +1042,13 @@ class CEOS_PALSAR_L10_RAW(object):
         for i in tqdm(range(echoes_i),
                       total=echoes_i, desc="H4 row-wise", leave=False):
             alpha_i = (ALPHAS if ALPHAS.ndim == 0 else ALPHAS[i])
-            r_0_scl_i = DIS_SLANT_RANGE + (R_ZERO - DIS_SLANT_RANGE) / alpha_i
+            R_ZERO_SCALING_i = DIS_SLANT_RANGE + (R_ZERO - DIS_SLANT_RANGE) / alpha_i
             h4_i = np.exp(
                 1j
                 * 4.0
                 * np.pi
                 / self.LAMBDA
-                * r_0_scl_i
+                * R_ZERO_SCALING_i
                 * (BETA[i] - 1.0)
             )
             data[i,:] = data[i,:] * h4_i
