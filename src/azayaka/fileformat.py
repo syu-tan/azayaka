@@ -1632,6 +1632,39 @@ class CEOS_PALSAR_L11_SLC(object):
             _write_observation_json(self, output_json_path)
 
 
+def check_ceos_polarization_orbit_exists(
+    path_ceos_folder: str,
+    polarimetry: str,
+    orbit_name: str,
+) -> None:
+    """
+    Check if IMG/LED files matching the given polarization and orbit exist in the CEOS folder.
+    Raises FileNotFoundError if not found.
+
+    Args:
+        path_ceos_folder: CEOS product folder
+        polarimetry: 偏波名 'HH', 'HV', 'VV', 'VH'
+        orbit_name: 軌道名 'A' or 'D'
+
+    Raises:
+        FileNotFoundError: If the IMG/LED files matching the given polarization and orbit do not exist
+    """
+    ceos_files = os.listdir(path_ceos_folder)
+    path_led = None
+    path_img = None
+    for name in ceos_files:
+        if name.startswith("LED-") and name.endswith(f"__{orbit_name}"):
+            path_led = os.path.join(path_ceos_folder, name)
+        if name.startswith(f"IMG-{polarimetry}-") and name.endswith(f"__{orbit_name}"):
+            path_img = os.path.join(path_ceos_folder, name)
+    if path_img is None or path_led is None:
+        raise FileNotFoundError(
+            f"IMG/LED not found: PATH={path_ceos_folder}, "
+            f"POL={polarimetry}, ORBIT={orbit_name}\n"
+            "The specified orbit or polarization does not match any file in the current directory."
+        )
+
+
 class CEOS_PALSAR2_L11_SLC(object):
     """
     ALOS-2 PALSAR-2 Level 1.1 CEOS Format Reader
