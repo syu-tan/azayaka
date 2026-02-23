@@ -17,7 +17,7 @@ from .azayaka_plugin_dialog import AzayakaPluginDialog
 
 # azayaka
 try:
-    from azayaka.fileformat import CEOS_PALSAR2_L11_SLC
+    from azayaka.fileformat import CEOS_PALSAR2_L11_SLC, check_ceos_polarization_orbit_exists
     from azayaka.interferometry import Interferometry
     from azayaka.geocode import Geocode
 except ImportError as e:
@@ -91,7 +91,33 @@ class InterferometryWorker(QThread):
                 self.error.emit("DEM Path is required")
                 return
 
+            polarization = self.inputs.get('polarization', 'HH')
+            orbit = self.inputs.get('orbit', 'A')
+            self.log_message.emit(f"Polarization: {polarization}")
+            self.log_message.emit(f"Orbit: {orbit}")
             self.log_message.emit(f"Pre-event Dir: {self.inputs['pre_event_dir']}")
+            QApplication.processEvents()
+
+            # Check if polarization and orbit exist in file names
+            try:
+                check_ceos_polarization_orbit_exists(
+                    self.inputs['pre_event_dir'], polarization, orbit
+                )
+                check_ceos_polarization_orbit_exists(
+                    self.inputs['post_event_dir'], polarization, orbit
+                )
+            except FileNotFoundError as e:
+                err_msg = (
+                    f"{str(e)}\n\n"
+                    "The specified orbit or polarization does not match any file in the current directory.\n"
+                    "Please check the polarization and orbit in the CEOS files."
+                )
+                self.log_message.emit(str(e))
+                self.log_message.emit("The specified orbit or polarization does not match any file in the current directory.")
+                self.log_message.emit("Please check the polarization and orbit in the CEOS files.")
+                self.error.emit(err_msg)
+                return
+
             self.log_message.emit(f"Post-event Dir: {self.inputs['post_event_dir']}")
             self.log_message.emit(f"Output Dir: {self.inputs['output_dir']}")
             self.log_message.emit(f"DEM Path: {self.inputs['dem_path']}")
@@ -104,11 +130,10 @@ class InterferometryWorker(QThread):
             self.log_message.emit("Loading CEOS files...")
             QApplication.processEvents()
 
-            # TODO: POLARIMETORY and ORBIT_NAME should be automatically determined from the files
             main_ceos = CEOS_PALSAR2_L11_SLC(
                 PATH_CEOS_FOLDER=self.inputs['pre_event_dir'],
-                POLARIMETORY="HH",
-                ORBIT_NAME="A",
+                POLARIMETORY=polarization,
+                ORBIT_NAME=orbit,
             )
             self.progress.emit(15)
             self.log_message.emit("Setting geometry for main CEOS...")
@@ -121,8 +146,8 @@ class InterferometryWorker(QThread):
 
             sub_ceos = CEOS_PALSAR2_L11_SLC(
                 PATH_CEOS_FOLDER=self.inputs['post_event_dir'],
-                POLARIMETORY="HH",
-                ORBIT_NAME="A",
+                POLARIMETORY=polarization,
+                ORBIT_NAME=orbit,
             )
             self.progress.emit(30)
             self.log_message.emit("Setting geometry for sub CEOS...")
@@ -224,10 +249,24 @@ class GeocodeWorker(QThread):
                 self.error.emit("Output Dir is required")
                 return
 
+            polarization = self.inputs.get('polarization', 'HH')
+            orbit = self.inputs.get('orbit', 'A')
+            self.log_message.emit(f"Polarization: {polarization}")
+            self.log_message.emit(f"Orbit: {orbit}")
             self.log_message.emit(f"SAR Dir: {self.inputs['sar_dir']}")
             self.log_message.emit(f"DEM Path: {self.inputs['dem_path']}")
             self.log_message.emit(f"Output Dir: {self.inputs['output_dir']}")
             self.log_message.emit(f"Processing Start Level: {self.inputs['processing_start_level']}")
+            QApplication.processEvents()
+
+            # Check if polarization and orbit exist in file names
+            try:
+                check_ceos_polarization_orbit_exists(
+                    self.inputs['sar_dir'], polarization, orbit
+                )
+            except FileNotFoundError as e:
+                self.error.emit(str(e))
+                return
 
             os.makedirs(self.inputs['output_dir'], exist_ok=True)
             output_geometory_json = os.path.join(self.inputs['output_dir'], "geocoded_geometry.json")
@@ -235,15 +274,15 @@ class GeocodeWorker(QThread):
             out_phase = os.path.join(self.inputs['output_dir'], "geocoded_phase.tif")
             out_kml = os.path.join(self.inputs['output_dir'], "geocoded_scene_footprint.kml")
 
-            # TODO: POLARIMETORY and ORBIT_NAME should be automatically determined from the files
+            # TODO: ORBIT_NAME should be automatically determined from the files
             # TODO: L1.0 implementation is required
             # only L1.1 is supported now(L1.0 implementation is required in the future)
             if self.inputs['processing_start_level'] == 'L1.1':
                 self.log_message.emit("Loading CEOS file...")
                 ceos = CEOS_PALSAR2_L11_SLC(
                     PATH_CEOS_FOLDER=self.inputs['sar_dir'],
-                    POLARIMETORY="HH",
-                    ORBIT_NAME="A",
+                    POLARIMETORY=polarization,
+                    ORBIT_NAME=orbit,
                 )
                 self.progress.emit(20)
             else:
@@ -565,7 +604,6 @@ class AzayakaPlugin:
         except Exception as e:
             self.logger.error(f"Error occurred during processing: {str(e)}", exc_info=True)
             QMessageBox.critical(self.dlg, "Processing Error", f"An error occurred during processing:\n{str(e)}")
-            self.dlg.processing_completed()
             QApplication.processEvents()
     
     def _run_insar_processing_async(self):
@@ -624,12 +662,8 @@ class AzayakaPlugin:
 
     def _on_insar_error(self, error_msg):
         """Handler for InSAR processing error"""
-        self.dlg.progressBar.setValue(0)
-        self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("Stop")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"InSAR processing failed:\n{error_msg}")
-        self.dlg.processing_completed()
         QApplication.processEvents()
 
     def _on_insar_cancelled(self):
@@ -701,12 +735,8 @@ class AzayakaPlugin:
     
     def _on_geocoding_error(self, error_msg):
         """Handler for Geocoding processing error"""
-        self.dlg.progressBar.setValue(0)
-        self.dlg.cancelButton.setEnabled(False)
-        self.dlg.cancelButton.setText("Stop")
         self.logger.error(error_msg)
         QMessageBox.critical(self.dlg, "Processing Error", f"Geocoding processing failed:\n{error_msg}")
-        self.dlg.processing_completed()
         QApplication.processEvents()
 
     def _on_geocoding_cancelled(self):
