@@ -61,11 +61,16 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def get_insar_inputs(self):
         """get the input values of the InSAR-tab"""
+        polarization = self.PolarizationList.currentText()
+        orbit_text = self.OrbitList.currentText()
+        orbit = "A" if orbit_text == "Ascending" else "D"
         dem_path = self.PreEventDir_2.filePath() if self.PreEventDir_2.filePath() else None
         pre_event_dir = self.PreEventDir.filePath() if self.PreEventDir.filePath() else None
         post_event_dir = self.PostEventDir.filePath() if self.PostEventDir.filePath() else None
         output_dir = self.OutputDir.filePath() if self.OutputDir.filePath() else None
         return {
+            'polarization': polarization,
+            'orbit': orbit,
             'dem_path': dem_path,
             'pre_event_dir': pre_event_dir,
             'post_event_dir': post_event_dir,
@@ -75,11 +80,16 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
     def get_geocoding_inputs(self):
         """get the input values of the Geocoding-tab"""
         processing_start_level = self.ProcessingStartLevel.currentText()
+        polarization = self.PolarizationList_2.currentText()
+        orbit_text = self.OrbitList_2.currentText()
+        orbit = "A" if orbit_text == "Ascending" else "D"
         dem_path = self.DEMPath.filePath() if self.DEMPath.filePath() else None
         sar_dir = self.SARDir.filePath() if self.SARDir.filePath() else None
         output_dir = self.OutputDir_2.filePath() if self.OutputDir_2.filePath() else None
         return {
             'processing_start_level': processing_start_level,
+            'polarization': polarization,
+            'orbit': orbit,
             'sar_dir': sar_dir,
             'dem_path': dem_path,
             'output_dir': output_dir,
