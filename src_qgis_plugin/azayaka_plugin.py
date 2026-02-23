@@ -274,8 +274,6 @@ class GeocodeWorker(QThread):
             out_phase = os.path.join(self.inputs['output_dir'], "geocoded_phase.tif")
             out_kml = os.path.join(self.inputs['output_dir'], "geocoded_scene_footprint.kml")
 
-            # TODO: ORBIT_NAME should be automatically determined from the files
-            # TODO: L1.0 implementation is required
             # only L1.1 is supported now(L1.0 implementation is required in the future)
             if self.inputs['processing_start_level'] == 'L1.1':
                 self.log_message.emit("Loading CEOS file...")
