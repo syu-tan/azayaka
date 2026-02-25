@@ -40,8 +40,31 @@ from tqdm import tqdm
 
 
 def _write_observation_json(obj, output_path: str):
+    """
+    Write a JSON summary of observation geometry and metadata.
+
+    Parameters
+    ----------
+    obj : object
+        Reader instance containing observation attributes.
+    output_path : str
+        Output JSON file path.
+    """
 
     def _to_list(value):
+        """
+        Convert numpy arrays to Python lists for JSON serialization.
+
+        Parameters
+        ----------
+        value : array_like or None
+            Value to convert.
+
+        Returns
+        -------
+        list or None
+            Converted list or None if input is None.
+        """
         if value is None:
             return None
         return value.tolist()
@@ -104,7 +127,11 @@ def _write_observation_json(obj, output_path: str):
 
 
 class CEOS_PALSAR_L10_RAW(object):
-    """ CEOS Format Reader """
+    """
+    CEOS PALSAR Level 1.0 RAW reader.
+
+    Parses JAXA CEOS records and exposes acquisition metadata and raw signal data.
+    """
     
     TIME_DAY_HOUR = 24
     TIME_DAY_MINITE = 60
@@ -1069,7 +1096,11 @@ class CEOS_PALSAR_L10_RAW(object):
 
 
 class CEOS_PALSAR_L11_SLC(object):
-    """ALOS PALSAR Level 1.1 CEOS Format Reader"""
+    """
+    CEOS PALSAR Level 1.1 SLC reader.
+
+    Parses ALOS PALSAR Level 1.1 CEOS products and exposes SLC data and metadata.
+    """
 
     TIME_DAY_HOUR = 24
     TIME_DAY_MINITE = 60
