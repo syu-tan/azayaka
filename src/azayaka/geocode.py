@@ -547,20 +547,17 @@ class Geocode(object):
     @classmethod
     def _interpolate_with_spline_fixed(cls, dem_sparse, valid_mask, height, width):
         valid_points = np.where(valid_mask)
-        valid_values = dem_sparse[valid_mask].astype(np.float32)
+        valid_values = dem_sparse[valid_mask].astype(np.float16)
         if len(valid_values) == 0:
             return dem_sparse
 
-        coarse_factor = 4
+        coarse_factor = 8
         coarse_height = max(4, height // coarse_factor)
         coarse_width = max(4, width // coarse_factor)
 
         azimuth_coarse = np.linspace(0, height - 1, coarse_height)
         range_coarse = np.linspace(0, width - 1, coarse_width)
         azimuth_grid, range_grid = np.meshgrid(azimuth_coarse, range_coarse, indexing="ij")
-        
-        del azimuth_coarse, range_coarse
-        gc.collect()
 
         points = np.column_stack((valid_points[0], valid_points[1]))
         grid_points = np.column_stack((azimuth_grid.ravel(), range_grid.ravel()))
@@ -587,7 +584,7 @@ class Geocode(object):
             kx = min(3, coarse_height - 1)
             ky = min(3, coarse_width - 1)
             interp_func = RectBivariateSpline(
-                 azimuth_coarse, range_coarse, coarse_dem_smooth, kx=kx, ky=ky, s=0
+                azimuth_coarse, range_coarse, coarse_dem_smooth, kx=kx, ky=ky, s=0
             )
             azimuth_full = np.arange(height)
             range_full = np.arange(width)
