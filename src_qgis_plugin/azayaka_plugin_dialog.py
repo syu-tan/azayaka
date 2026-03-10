@@ -23,6 +23,8 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.progressBar.setFormat("%p%")
         # Initialize the cancel button
         self.cancelButton.clicked.connect(self._on_cancel_clicked)
+        # Initialize the close button (closes dialog when processing is complete)
+        self.closeButton.clicked.connect(self.reject)
 
     def accept(self):
         """Handler for OK button press
@@ -47,6 +49,7 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
     def clear_log(self):
         """clear the text area of the log-tab"""
         self.plainTextEdit.clear()
+        self.closeButton.setEnabled(False)
 
     def processing_completed(self):
         """processing completed: re-enable the buttons"""
@@ -58,6 +61,8 @@ class AzayakaPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # disable the cancel button
         self.cancelButton.setEnabled(False)
         self.cancelButton.setText("Stop")
+        # enable the close button (to close the dialog)
+        self.closeButton.setEnabled(True)
 
     def get_insar_inputs(self):
         """get the input values of the InSAR-tab"""

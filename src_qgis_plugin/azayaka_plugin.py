@@ -577,6 +577,8 @@ class AzayakaPlugin:
         self.dlg.button_box.button(QDialogButtonBox.Ok).setEnabled(False)
         # disable the Cancel button (the button is disabled during processing)
         self.dlg.button_box.button(QDialogButtonBox.Cancel).setEnabled(False)
+        # disable the Close button during processing
+        self.dlg.closeButton.setEnabled(False)
         # update the UI
         QApplication.processEvents()
         # show the test message
@@ -661,6 +663,8 @@ class AzayakaPlugin:
     def _on_insar_error(self, error_msg):
         """Handler for InSAR processing error"""
         self.logger.error(error_msg)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.processing_completed()
         QMessageBox.critical(self.dlg, "Processing Error", f"InSAR processing failed:\n{error_msg}")
         QApplication.processEvents()
 
@@ -734,6 +738,8 @@ class AzayakaPlugin:
     def _on_geocoding_error(self, error_msg):
         """Handler for Geocoding processing error"""
         self.logger.error(error_msg)
+        self.dlg.cancelButton.setEnabled(False)
+        self.dlg.processing_completed()
         QMessageBox.critical(self.dlg, "Processing Error", f"Geocoding processing failed:\n{error_msg}")
         QApplication.processEvents()
 
