@@ -20,6 +20,7 @@ pip install -r 'path/to/requirements.txt'
 
 - 2. azayaka\src_qgis_plugin配下のファイルを以下に配置
     - C:\Users\hogehoge\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\azayaka_plugin
+    - ※またはQGISプラグイン管理からzipでinstallも可能（\azayaka\src_azayaka_pluginを事前にzip化しておくこと）
 
 - 3. プラグインのリロード
     QGISのプラグイン'Plugin Reloader'を使用するとQGISを再起動しなくて良いため、効率的
