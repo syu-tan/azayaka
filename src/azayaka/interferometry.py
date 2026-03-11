@@ -523,9 +523,6 @@ class Interferometry:
         # # DEM Gradient Range := DEM_Radar(x, y+1) - DEM_Radar(x, y-1)
         dem_gradient_range = np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32)
         dem_gradient_range[:, 1:-1] = dem_radar_smooth_cropped[:, 2:] - dem_radar_smooth_cropped[:,:-2]
-        
-        del dem_radar_smooth_cropped
-        gc.collect()
 
         signal_crop = signal[top_az:bot_az, left_rg:right_rg]
         # Convert to intensity in dB scale
