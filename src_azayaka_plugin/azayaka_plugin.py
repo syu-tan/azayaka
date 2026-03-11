@@ -7,6 +7,7 @@ import glob
 from datetime import datetime
 
 # qgis
+from qgis.core import QgsRasterLayer, QgsProject
 from qgis.PyQt.QtCore import QObject, pyqtSignal, QTimer, QThread
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox, QDialogButtonBox, QApplication
@@ -359,6 +360,40 @@ class AzayakaPlugin:
         
         # Setup logger
         self.logger = self._setup_logger()
+
+    def _add_output_tifs_to_qgis(self, output_dir):
+        """Add all .tif files in the output directory to QGIS as raster layers"""
+        try:
+            if not output_dir:
+                self.logger.warning("Output directory is not specified. Skipping adding layers to QGIS.")
+                return
+
+            if not os.path.isdir(output_dir):
+                self.logger.warning(f"Output directory does not exist: {output_dir}")
+                return
+
+            tif_paths = glob.glob(os.path.join(output_dir, "*.tif"))
+
+            if not tif_paths:
+                self.logger.info(f"No .tif files found in output directory: {output_dir}")
+                return
+
+            project = QgsProject.instance()
+
+            for tif_path in tif_paths:
+                layer_name = os.path.basename(tif_path)
+                raster_layer = QgsRasterLayer(tif_path, layer_name)
+
+                if not raster_layer.isValid():
+                    self.logger.warning(f"Failed to load raster layer: {tif_path}")
+                    continue
+
+                project.addMapLayer(raster_layer)
+                self.logger.info(f"Added raster layer to QGIS: {tif_path}")
+
+        except Exception as e:
+            import traceback
+            self.logger.error(f"Failed to add output .tif files to QGIS: {str(e)}\n{traceback.format_exc()}")
     
     def _fix_stdout_for_tqdm(self):
         """Fix sys.stdout for tqdm in QGIS plugin environment"""
@@ -657,7 +692,22 @@ class AzayakaPlugin:
         self.dlg.cancelButton.setText("Stop")
         self.dlg.processing_completed()
         self.logger.info("Processing completed!")
-        QMessageBox.information(self.dlg, "Success", "InSAR processing completed successfully!")
+        try:
+            # get latest InSAR inputs to determine output directory
+            inputs = self.dlg.get_insar_inputs()
+            output_dir = inputs.get("output_dir")
+        except Exception:
+            output_dir = None
+
+        # Add all .tif files in the output directory to QGIS
+        self._add_output_tifs_to_qgis(output_dir)
+
+        QMessageBox.information(
+            self.dlg,
+            "Success",
+            "InSAR processing completed successfully!\n\n"
+            "All output .tif files have been added to QGIS as raster layers (if available).",
+        )
         QApplication.processEvents()
 
     def _on_insar_error(self, error_msg):
@@ -732,7 +782,22 @@ class AzayakaPlugin:
         self.dlg.cancelButton.setText("Stop")
         self.dlg.processing_completed()
         self.logger.info("Processing completed!")
-        QMessageBox.information(self.dlg, "Success", "Geocoding processing completed successfully!")
+        try:
+            # get latest Geocoding inputs to determine output directory
+            inputs = self.dlg.get_geocoding_inputs()
+            output_dir = inputs.get("output_dir")
+        except Exception:
+            output_dir = None
+
+        # Add all .tif files in the output directory to QGIS
+        self._add_output_tifs_to_qgis(output_dir)
+
+        QMessageBox.information(
+            self.dlg,
+            "Success",
+            "Geocoding processing completed successfully!\n\n"
+            "All output .tif files have been added to QGIS as raster layers (if available).",
+        )
         QApplication.processEvents()
     
     def _on_geocoding_error(self, error_msg):
