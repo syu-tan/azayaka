@@ -21,6 +21,36 @@ def save_scene_kml(
     overlay_size: int = 1024,
     xyz2geo_func: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]] = None,
 ):
+    """
+    Export the SAR scene footprint to a KML file.
+
+    Parameters
+    ----------
+    geocoder : Geocode
+        Geocode instance containing SAR geometry and orbit information.
+    output_kml_path : str
+        Output path for the KML file.
+    max_iter : int, optional
+        Maximum iterations for the range-Doppler back-geocoding solver.
+    look_direction : str, optional
+        Look direction override ("R" or "L"). If None, uses the geocoder setting.
+    include_overlay : bool, optional
+        Whether to embed a downsampled intensity overlay.
+    overlay_size : int, optional
+        Output overlay size in pixels for both width and height.
+    xyz2geo_func : callable, optional
+        Function to convert ECEF XYZ to (lat, lon, height) in radians/meters.
+
+    Returns
+    -------
+    list[tuple[float, float]]
+        Scene corners as (lat, lon) in degrees, ordered around the footprint.
+
+    Raises
+    ------
+    ValueError
+        If `xyz2geo_func` is not provided or computed corners are out of bounds.
+    """
     if xyz2geo_func is None:
         raise ValueError("xyz2geo_func is required.")
     if look_direction is None:
@@ -207,4 +237,3 @@ def save_scene_kml(
     with open(output_kml_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     return corners
-

@@ -1,4 +1,4 @@
-# azayaka
+![img](./doc/figure/001_project_icon.png)
 
 Azayaka is a QGIS plugin for processing Synthetic Aperture Radar (SAR) data. It supports JAXA CEOS format SAR data and provides tools for InSAR (Interferometric SAR) analysis and geocoding.
 

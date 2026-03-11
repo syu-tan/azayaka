@@ -13,7 +13,7 @@ Azayaka:
 
 __all__ = ["__version__"]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 AA_STR = r"""
  ____    _    ____        _                                    _            
