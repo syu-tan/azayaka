@@ -27,7 +27,7 @@ jobs:
           pip install -e .
       - name: Install test tools
         run: |
-          pip install pytest build twine tomllib
+          pip install pytest build twine tomli
       - name: Run tests
         run: pytest
       - name: Build and check dist
