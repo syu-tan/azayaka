@@ -8,6 +8,7 @@
 
 from PyQt5 import QtCore
 
+# \src_azayaka_plugin\icon.png
 qt_resource_data = b"\
 \x00\x00\x5e\x8a\
 \x89\
