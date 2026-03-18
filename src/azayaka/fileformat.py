@@ -25,7 +25,7 @@ Azayaka:
 """
 
 import os, gc, warnings, json, time
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -803,7 +803,7 @@ class CEOS_PALSAR_L10_RAW(object):
         7. FFT/IFFT を用いて周波数領域と時刻領域を往復し、最終的な複素画像を返します。
 
         Args:
-            ground_velocity (float | None): 地上速度の手動指定。None の場合は推定値を使用します。
+            ground_velocity (Optional[float]): 地上速度の手動指定。None の場合は推定値を使用します。
             PATH_OUTPUT (str): ジオメトリ生成時の出力先フォルダ。
 
         Returns:
@@ -2682,7 +2682,7 @@ class CEOS_PALSAR2_L11_SLC(object):
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-2 PALSAR-2 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: Optional[str]=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 
@@ -3587,7 +3587,7 @@ class CEOS_PALSAR3_L11_SLC(object):
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-4 PALSAR-3 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: Optional[str]=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 
