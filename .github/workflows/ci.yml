@@ -23,6 +23,6 @@ jobs:
           pip install -e .
       - name: Install test dependencies
         run: |
-          pip install pytest
+          pip install pytest tomllib
       - name: Run tests
         run: pytest
