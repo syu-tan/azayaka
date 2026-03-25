@@ -8,15 +8,16 @@ Azayaka is a QGIS plugin for processing Synthetic Aperture Radar (SAR) data. It 
     - download azayaka\requirements.txt in your download directory
     - Open the OSGeo4W shell as an administrator and run the following command:
         - ```pip install -r 'path/to/requirements.txt'```
-where 'path/to/requirements.txt' means the absolute path to azayaka\requirements.txt
+            where 'path/to/requirements.txt' means the absolute path to azayaka\requirements.txt
 
 2. install "Azayaka" in the following two ways:
     - case-1(easy): Search for "Azayaka" in the QGIS Plugin Manager and install.
     - case-2: open OSGeo4W shell and run ```pip install azayaka```
+        - OSGeo4W is available for Windows user
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.9+
 
 ## Usage
 
