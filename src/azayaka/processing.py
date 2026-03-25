@@ -12,6 +12,6 @@ Azayaka:
 # Import sub-modules
 from . import fileformat
 from . import geocode
-from . import interferometory
+from . import interferometry
 
-__all__ = ["format", "geocode", "interferometory"]
+__all__ = ["format", "geocode", "interferometry"]

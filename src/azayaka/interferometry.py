@@ -25,15 +25,37 @@ from . import geocode
 
 
 class Interferometry:
-    """Interferometry SAR Module Class."""
+    """
+    SAR interferometry processing pipeline.
+
+    Provides coregistration, interferogram generation, filtering, and geocoding
+    utilities for a main/sub SLC pair.
+    """
 
     def __init__(self, main, sub):
+        """
+        Initialize the interferometry workflow with main and sub SLC data.
+
+        Parameters
+        ----------
+        main : object
+            Primary SAR reader instance.
+        sub : object
+            Secondary SAR reader instance.
+        """
         self.main = main
         self.sub = sub
         self._align_signals_to_main()
         self._init_baseline_geometry()
 
     def _align_signals_to_main(self) -> None:
+        """
+        Align main and sub signals by cropping to the common shape.
+
+        Returns
+        -------
+        None
+        """
         main_shape = self.main.signal.shape
         sub_shape = self.sub.signal.shape
         if main_shape != sub_shape:
@@ -53,6 +75,18 @@ class Interferometry:
         print(f"Aligned main/sub signals to shape: {target_shape}")
 
     def _init_baseline_geometry(self, baseline_offset=0.0) -> None:
+        """
+        Compute baseline geometry between main and sub orbits.
+
+        Parameters
+        ----------
+        baseline_offset : float, optional
+            Offset added to the perpendicular baseline component.
+
+        Returns
+        -------
+        None
+        """
         # Parameter
         self.baseline_offset = baseline_offset
         
@@ -121,13 +155,32 @@ class Interferometry:
         self.baseline_cos_alpha = np.cos(self.baseline_angle_alpha)
         self.baseline_sin_alpha = np.sin(self.baseline_angle_alpha)
         
-        # Equation - Condition: No 1.9 from No 2.2
+        # Equation - Condition: No 1.9 from No 2.22
         # # Height of Main Satellite
         self.height_sat = self.main.HEIGHT_SAT[:num_aperture_sample]
         print("Initialized baseline geometry for interferometry processing.")
 
     @staticmethod
     def _earth_sign(x_main, y_main, x_sub, y_sub, orbit_name: str, sign: int=1) -> int:
+        """
+        Determine the sign for baseline orientation.
+
+        Parameters
+        ----------
+        x_main, y_main : np.ndarray
+            Main satellite ECEF coordinates.
+        x_sub, y_sub : np.ndarray
+            Sub satellite ECEF coordinates.
+        orbit_name : str
+            Orbit direction label (e.g., "A", "D").
+        sign : int, optional
+            Initial sign value.
+
+        Returns
+        -------
+        int
+            Sign adjusted by orbit direction and relative longitude.
+        """
         longiture_main = np.arctan2(y_main, x_main)
         longiture_sub = np.arctan2(y_sub, x_sub)
 
@@ -146,6 +199,25 @@ class Interferometry:
         window_size: int,
         mean_m_squared: Optional[np.ndarray]=None,
     ) -> np.ndarray:
+        """
+        Compute local interferometric coherence.
+
+        Parameters
+        ----------
+        clx_m : np.ndarray
+            Main complex image.
+        clx_s : np.ndarray
+            Secondary complex image.
+        window_size : int
+            Window size for local averaging.
+        mean_m_squared : np.ndarray, optional
+            Precomputed mean of |clx_m|^2 for reuse.
+
+        Returns
+        -------
+        np.ndarray
+            Coherence map.
+        """
         ifg = clx_m * np.conj(clx_s)
         mean_ifg = uniform_filter(ifg.real, size=window_size, mode="constant") + 1j * uniform_filter(
             ifg.imag, size=window_size, mode="constant"
@@ -158,7 +230,7 @@ class Interferometry:
         coherence = np.zeros_like(denominator, dtype=np.float32)
         valid_mask = denominator > 1e-10
         # Equation - Condition: No 1.10
-        # # Coherence := |<M> * <S>| / sqrt(<|M|²> * <|S|²>)
+        # # Coherence := |Σ(M * conj(S))| / sqrt(Σ(M²) * Σ(S²))
         coherence[valid_mask] = np.abs(mean_ifg[valid_mask]) / denominator[valid_mask]
         return coherence
 
@@ -172,6 +244,33 @@ class Interferometry:
         shift_range_max: int=2,
         stride: int=1,
     ) -> Tuple[np.ndarray, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """
+        Estimate fine shifts by maximizing coherence.
+
+        Parameters
+        ----------
+        clx_m : np.ndarray
+            Main complex image.
+        clx_s : np.ndarray
+            Secondary complex image.
+        window_size : int, optional
+            Window size for coherence computation.
+        shift_range_min : int, optional
+            Minimum shift (pixels).
+        shift_range_max : int, optional
+            Maximum shift (pixels).
+        stride : int, optional
+            Sampling stride for sparse search.
+
+        Returns
+        -------
+        clx_s_reg : np.ndarray
+            Coregistered secondary image.
+        coh_best : np.ndarray
+            Best coherence map.
+        shift_map : tuple[np.ndarray, np.ndarray]
+            (azimuth_shift_map, range_shift_map).
+        """
         height, width = clx_m.shape
         clx_s = clx_s[:height,:width]
 
@@ -232,6 +331,23 @@ class Interferometry:
 
     @staticmethod
     def _multilook_filter(image: np.ndarray, looks_azimuth: int, looks_range: int) -> np.ndarray:
+        """
+        Apply multilook averaging in azimuth and range.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image.
+        looks_azimuth : int
+            Number of looks in azimuth.
+        looks_range : int
+            Number of looks in range.
+
+        Returns
+        -------
+        np.ndarray
+            Filtered image.
+        """
         if looks_azimuth <= 1 and looks_range <= 1:
             return image
         if np.iscomplexobj(image):
@@ -242,6 +358,21 @@ class Interferometry:
 
     @staticmethod
     def _convolve2d(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+        """
+        Perform a valid 2D convolution using stride tricks.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image.
+        kernel : np.ndarray
+            Convolution kernel.
+
+        Returns
+        -------
+        np.ndarray
+            Convolved output.
+        """
         shape = (
             image.shape[0] - kernel.shape[0] + 1,
             image.shape[1] - kernel.shape[1] + 1,
@@ -252,6 +383,23 @@ class Interferometry:
 
     @staticmethod
     def _pad_singlechannel_image(image: np.ndarray, kernel_shape: Tuple[int, int], boundary: str) -> np.ndarray:
+        """
+        Pad a single-channel image for convolution.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image.
+        kernel_shape : tuple[int, int]
+            Kernel shape.
+        boundary : str
+            Padding mode passed to `np.pad`.
+
+        Returns
+        -------
+        np.ndarray
+            Padded image.
+        """
         return np.pad(
             image,
             ((int(kernel_shape[0] / 2),), (int(kernel_shape[1] / 2),)),
@@ -260,17 +408,64 @@ class Interferometry:
 
     @classmethod
     def _convolve2d_safe(cls, image: np.ndarray, kernel: np.ndarray, boundary: str="edge") -> np.ndarray:
+        """
+        Convolve with padding to preserve size.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image.
+        kernel : np.ndarray
+            Convolution kernel.
+        boundary : str, optional
+            Padding mode. If empty, no padding is applied.
+
+        Returns
+        -------
+        np.ndarray
+            Convolved output.
+        """
         pad_image = cls._pad_singlechannel_image(image, kernel.shape, boundary) if boundary else image
         return cls._convolve2d(pad_image, kernel)
 
     @staticmethod
     def _create_averaging_kernel(size: Tuple[int, int]) -> np.ndarray:
+        """
+        Create a normalized averaging kernel.
+
+        Parameters
+        ----------
+        size : tuple[int, int]
+            Kernel size.
+
+        Returns
+        -------
+        np.ndarray
+            Averaging kernel.
+        """
         return np.full(size, 1.0 / (size[0] * size[1]))
 
     @classmethod
     def _goldstein_filter_patch(
         cls, patch: np.ndarray, alpha: float, filter_kernel: np.ndarray
     ) -> np.ndarray:
+        """
+        Apply Goldstein phase filtering to a single patch.
+
+        Parameters
+        ----------
+        patch : np.ndarray
+            Complex input patch.
+        alpha : float
+            Goldstein filter exponent.
+        filter_kernel : np.ndarray
+            Smoothing kernel in frequency domain.
+
+        Returns
+        -------
+        np.ndarray
+            Filtered patch.
+        """
         # Goldstein Phase Filter for a single patch
         # Equation - Condition: No 1.16
         # # Goldstein Filtered Patch := IFFT{ FFT{Patch} * |FFT{Patch} * H_conj|^α }
@@ -292,6 +487,27 @@ class Interferometry:
         step: int=8,
         filter_size: int=3,
     ) -> np.ndarray:
+        """
+        Apply Goldstein phase filtering over an image.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Complex interferogram or phase image.
+        alpha : float, optional
+            Goldstein exponent.
+        patch_size : int, optional
+            Patch size for local filtering.
+        step : int, optional
+            Step size for patch traversal.
+        filter_size : int, optional
+            Size of averaging kernel for smoothing.
+
+        Returns
+        -------
+        np.ndarray
+            Filtered image.
+        """
         if patch_size <= 1:
             return image
         filter_kernel = cls._create_averaging_kernel((filter_size, filter_size))
@@ -312,6 +528,19 @@ class Interferometry:
         return output
 
     def _compute_topography_phase(self, dem_radar: np.ndarray) -> np.ndarray:
+        """
+        Simulate topography phase for the full radar grid.
+
+        Parameters
+        ----------
+        dem_radar : np.ndarray
+            DEM resampled to radar coordinates.
+
+        Returns
+        -------
+        np.ndarray
+            Complex topography phase screen.
+        """
         dem_radar = dem_radar[: self.num_aperture_sample,: self.num_pixel]
         height_main_observation = self.main.DIS_ELLIPSOID_RADIUS + dem_radar
 
@@ -321,14 +550,15 @@ class Interferometry:
         for idx_line in tqdm(range(self.num_aperture_sample), desc="Topography phase"):
             
             # Equation - Condition: No 1.11
-            # # Height Cosine/Sine := (R² + H_sub² - H_main²) / (2 * R * H_sub)
+            # # Height Cosine = (R² + H_sub² - H_main_obs²) / (2 * R * H_sub)
+            # # Height Sine = √(1 - Cosine²)
             height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[idx_line]
             height_cos_theta = (slant_range ** 2 + height_sub ** 2 - height_main_observation[idx_line,:] ** 2) / \
                 (2.0 * slant_range * height_sub)
             height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
             
             # Equation - Condition: No 1.12
-            # # Topography Phase Simulation := R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
+            # # Topography Phase Simulation = R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))
             topography_phase_simulation = (
                 slant_range ** 2
                 +self.baseline[idx_line] ** 2
@@ -357,6 +587,23 @@ class Interferometry:
     def _compute_topography_phase_cropped(
         self, dem_radar_crop: np.ndarray, top_az: int, left_rg: int
     ) -> np.ndarray:
+        """
+        Simulate topography phase for a cropped radar window.
+
+        Parameters
+        ----------
+        dem_radar_crop : np.ndarray
+            Cropped DEM in radar coordinates.
+        top_az : int
+            Top azimuth index of the crop in the full grid.
+        left_rg : int
+            Left range index of the crop in the full grid.
+
+        Returns
+        -------
+        np.ndarray
+            Complex topography phase screen for the crop.
+        """
         crop_lines, crop_pixels = dem_radar_crop.shape
         slant_range = self.main.SLANT_RANGE_SAMPLE[left_rg: left_rg + crop_pixels]
         height_main_observation = self.main.DIS_ELLIPSOID_RADIUS + dem_radar_crop
@@ -371,8 +618,8 @@ class Interferometry:
             height_sub = self.sub.DIS_ELLIPSOID_RADIUS + self.height_sat[az_idx]
             height_cos_theta = (
                 slant_range ** 2
-                + height_sub ** 2
-                - height_main_observation[idx_line,:] ** 2
+                +height_sub ** 2
+                -height_main_observation[idx_line,:] ** 2
             ) / (2.0 * slant_range * height_sub)
             height_sin_theta = np.sqrt(np.maximum(1.0 - height_cos_theta ** 2, 0.0))
 
@@ -409,6 +656,23 @@ class Interferometry:
     def _pad_to_shape(
         data: np.ndarray, target_shape: Tuple[int, int], fill_value
     ) -> np.ndarray:
+        """
+        Pad an array to a target shape.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Input array.
+        target_shape : tuple[int, int]
+            Desired output shape.
+        fill_value : scalar
+            Fill value for padded regions.
+
+        Returns
+        -------
+        np.ndarray
+            Padded array.
+        """
         # Equation - Condition: No 1.15
         # # Pad data to target shape with fill_value
         padded = np.full(target_shape, fill_value, dtype=data.dtype)
@@ -427,6 +691,37 @@ class Interferometry:
         fine_stride: int=1,
         coarse_downsample: int=1,
     ) -> Tuple[np.ndarray, np.ndarray, Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
+        """
+        Coregister a secondary SLC to the main SLC.
+
+        Parameters
+        ----------
+        slc_main : np.ndarray
+            Main SLC image.
+        slc_sub : np.ndarray
+            Secondary SLC image.
+        fine : bool, optional
+            Whether to perform fine coregistration.
+        coherence_window : int, optional
+            Window size for coherence computation.
+        fine_shift_range : int, optional
+            Search range (pixels) for fine shifts.
+        fine_stride : int, optional
+            Stride for fine shift search.
+        coarse_downsample : int, optional
+            Downsample factor for coarse phase correlation.
+
+        Returns
+        -------
+        slc_sub_reg : np.ndarray
+            Coregistered secondary SLC.
+        coherence_reg : np.ndarray
+            Coherence after registration.
+        coarse_shift : tuple[float, float]
+            Coarse (range, azimuth) shift estimate.
+        shift_map : tuple[np.ndarray, np.ndarray]
+            Fine per-pixel shift maps (azimuth, range).
+        """
         intensity_main = np.abs(slc_main).astype(np.float32)
         intensity_main *= intensity_main
         intensity_sub = np.abs(slc_sub).astype(np.float32)
@@ -439,8 +734,8 @@ class Interferometry:
         # Convert to dB scale
         # Equation - Condition: No 1.17
         # # Intensity (dB) := 10 * log10(Intensity^2) + Adjustment
-        intensity_main = 20.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10))
-        intensity_sub = 20.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10))
+        intensity_main = 20.0 * np.log10(np.clip(intensity_main, a_min=1e-10, a_max=1e10)) - 10.0
+        intensity_sub = 20.0 * np.log10(np.clip(intensity_sub, a_min=1e-10, a_max=1e10)) - 10.0
 
         # Coarse coregistration using phase correlation
         # Equation - Condition: No 1.18
@@ -492,6 +787,27 @@ class Interferometry:
         dem_coreg_shift_range: int,
         dem_coreg_stride: int,
     ):
+        """
+        Compute DEM-based registration parameters for geocoding.
+
+        Parameters
+        ----------
+        geocoder : Geocode
+            Geocode helper instance.
+        signal : np.ndarray
+            Radar-domain signal used for registration.
+        dem_coreg_window_size : int
+            Window size for DEM-to-image correlation.
+        dem_coreg_shift_range : int
+            Search range (pixels) for DEM registration.
+        dem_coreg_stride : int
+            Sampling stride for the correlation search.
+
+        Returns
+        -------
+        dict
+            Registration metadata including crop window and shift maps.
+        """
         dem_radar_smooth, _ = geocoder._geocode_dem_to_radar_smooth(
             geocoder.dem,
             geocoder.idx_azimuth,
@@ -514,6 +830,10 @@ class Interferometry:
             raise ValueError("No overlap between radar coordinates and DEM after cropping")
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
+        
+        del dem_radar_smooth
+        gc.collect()
+        
         # DEM gradient computation
         # Equation - Condition: No 1.19
         # # DEM Gradient Range := DEM_Radar(x, y+1) - DEM_Radar(x, y-1)
@@ -527,11 +847,17 @@ class Interferometry:
             20.0 * np.log10(np.clip(np.abs(signal_crop), a_min=1e-10, a_max=None)) - 10.0
         )
         
+        del signal_crop
+        gc.collect()
+        
         # Equation - Condition: No 1.18 (repeated)
         difference, _ = cv2.phaseCorrelate(
             dem_gradient_range.astype(np.float32), intensity_crop.astype(np.float32)
         )
         shift_range, shift_azimuth = difference
+        
+        del _, difference
+        gc.collect()
 
         intensity_coarse = shift(
             intensity_crop,
@@ -547,7 +873,6 @@ class Interferometry:
             stride=dem_coreg_stride,
         )
 
-        del dem_radar_smooth
         del dem_gradient_range
         del intensity_crop
         del intensity_coarse
@@ -568,6 +893,23 @@ class Interferometry:
     def _apply_geocode_registration(
         geocoder: geocode.Geocode, radar_image: np.ndarray, registration: Dict
     ) -> np.ndarray:
+        """
+        Apply registration parameters and geocode a radar image.
+
+        Parameters
+        ----------
+        geocoder : Geocode
+            Geocode helper instance.
+        radar_image : np.ndarray
+            Radar-domain image to transform.
+        registration : dict
+            Registration metadata from `_prepare_geocode_registration`.
+
+        Returns
+        -------
+        np.ndarray
+            Geocoded image.
+        """
         top_az = registration["top_az"]
         bot_az = registration["bot_az"]
         left_rg = registration["left_rg"]
@@ -589,6 +931,23 @@ class Interferometry:
     def _apply_geocode_registration_cropped(
         geocoder: geocode.Geocode, radar_crop: np.ndarray, registration: Dict
     ) -> np.ndarray:
+        """
+        Apply registration to a pre-cropped radar image and geocode.
+
+        Parameters
+        ----------
+        geocoder : Geocode
+            Geocode helper instance.
+        radar_crop : np.ndarray
+            Cropped radar-domain image.
+        registration : dict
+            Registration metadata from `_prepare_geocode_registration`.
+
+        Returns
+        -------
+        np.ndarray
+            Geocoded image.
+        """
         top_az = registration["top_az"]
         left_rg = registration["left_rg"]
         shift_range = registration["shift_range"]
@@ -611,6 +970,22 @@ class Interferometry:
         vmax: Optional[float]=None,
         cmap: Optional[str]=None,
     ) -> None:
+        """
+        Save an image to JPEG with optional colormap.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image.
+        path : str
+            Output file path.
+        vmin : float, optional
+            Minimum value for normalization.
+        vmax : float, optional
+            Maximum value for normalization.
+        cmap : str, optional
+            Matplotlib colormap name. If None, saves grayscale.
+        """
         if vmin is None:
             vmin = float(np.nanmin(image))
         if vmax is None:
@@ -637,6 +1012,24 @@ class Interferometry:
         vmax: float=1.0,
         threshold: Optional[float]=None,
     ) -> None:
+        """
+        Save a histogram plot to JPEG.
+
+        Parameters
+        ----------
+        values : np.ndarray
+            Input values for histogram.
+        path : str
+            Output file path.
+        bins : int, optional
+            Number of histogram bins.
+        vmin : float, optional
+            Minimum histogram range.
+        vmax : float, optional
+            Maximum histogram range.
+        threshold : float, optional
+            Optional threshold indicator to draw on the histogram.
+        """
         valid = np.isfinite(values)
         values = values[valid]
         fig, ax = plt.subplots(figsize=(16, 6), dpi=120)
@@ -681,6 +1074,69 @@ class Interferometry:
         slc_coreg_coarse_downsample: int=1,
         sub_buffer: int=1000,
     ) -> Dict[str, str]:
+        """
+        Run the full interferometry processing pipeline and save outputs.
+
+        Parameters
+        ----------
+        output_dir : str
+            Output directory for GeoTIFF/JPEG products.
+        dem_path : str, optional
+            Path to DEM GeoTIFF.
+        dem_bounds : tuple[float, float, float, float], optional
+            DEM bounds (min_lon, min_lat, max_lon, max_lat).
+        dem_shape : tuple[int, int], optional
+            DEM shape (height, width).
+        dem_transform : rasterio.Affine, optional
+            DEM affine transform.
+        dem_crs : str, optional
+            DEM CRS (e.g., "EPSG:4326").
+        buffer_sample : int, optional
+            Cropping buffer in radar samples.
+        look_direction : str, optional
+            Look direction ("R" or "L").
+        output_prefix : str, optional
+            Prefix for output filenames.
+        fine_registration : bool, optional
+            Enable fine SLC coregistration.
+        coherence_window : int, optional
+            Window size for coherence estimation.
+        fine_shift_range : int, optional
+            Search range for fine SLC shifts.
+        fine_stride : int, optional
+            Stride for fine shift search.
+        multilook_azimuth : int, optional
+            Multilook factor in azimuth.
+        multilook_range : int, optional
+            Multilook factor in range.
+        goldstein_alpha : float, optional
+            Goldstein filter exponent.
+        goldstein_patch_size : int, optional
+            Patch size for Goldstein filtering.
+        goldstein_step : int, optional
+            Patch step for Goldstein filtering.
+        goldstein_filter_size : int, optional
+            Filter kernel size for Goldstein filtering.
+        coherence_threshold_quantile : float, optional
+            Quantile to threshold coherence.
+        coherence_histogram_threshold : float, optional
+            Explicit threshold for coherence masking.
+        dem_coreg_window_size : int, optional
+            Window size for DEM coregistration.
+        dem_coreg_shift_range : int, optional
+            Shift range for DEM coregistration.
+        dem_coreg_stride : int, optional
+            Stride for DEM coregistration.
+        slc_coreg_coarse_downsample : int, optional
+            Downsample factor for coarse SLC coregistration.
+        sub_buffer : int, optional
+            Buffer margin for sub-image cropping.
+
+        Returns
+        -------
+        dict[str, str]
+            Mapping of output product names to file paths.
+        """
         geocoder = geocode.Geocode(
             self.main,
             dem_path=dem_path,

@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AzayakaPluginDialogBase</class>
+ <widget class="QDialog" name="AzayakaPluginDialogBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>709</width>
+    <height>537</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Azayaka</string>
+  </property>
+  <widget class="QDialogButtonBox" name="button_box">
+   <property name="geometry">
+    <rect>
+     <x>290</x>
+     <y>460</y>
+     <width>341</width>
+     <height>32</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+   <property name="standardButtons">
+    <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+   </property>
+  </widget>
+  <widget class="QTabWidget" name="tabWidget">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>40</y>
+     <width>631</width>
+     <height>411</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="InSARTab">
+    <attribute name="title">
+     <string>InSAR</string>
+    </attribute>
+    <widget class="QLabel" name="label_9">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>163</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>DEM Path</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="PreEventDir_2">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>160</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_2">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>213</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Pre-event Dir</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="PreEventDir">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>210</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::GetDirectory</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_3">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>263</y>
+       <width>121</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Post-event Dir</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="PostEventDir">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>260</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::GetDirectory</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_4">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>313</y>
+       <width>111</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Output Dir</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="OutputDir">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>310</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::GetDirectory</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_10">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>30</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Polarization</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="PolarizationList">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>30</y>
+       <width>67</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>HH</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>VV</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>HV</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>VH</string>
+      </property>
+     </item>
+    </widget>
+    <widget class="QLabel" name="label_12">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>121</y>
+       <width>151</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Processing Start Level</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="ProcessingStartLevel_2">
+     <property name="geometry">
+      <rect>
+       <x>170</x>
+       <y>120</y>
+       <width>81</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>L1.0</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>L1.1</string>
+      </property>
+     </item>
+    </widget>
+    <widget class="QLabel" name="label_13">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>70</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Orbit</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="OrbitList">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>70</y>
+       <width>121</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>Ascending</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Descending</string>
+      </property>
+     </item>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="GeocodingTab">
+    <attribute name="title">
+     <string>Geocoding</string>
+    </attribute>
+    <widget class="QLabel" name="label_7">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>121</y>
+       <width>151</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Processing Start Level</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="ProcessingStartLevel">
+     <property name="geometry">
+      <rect>
+       <x>170</x>
+       <y>120</y>
+       <width>81</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>L1.0</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>L1.1</string>
+      </property>
+     </item>
+    </widget>
+    <widget class="QLabel" name="label_8">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>173</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>DEM Path</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="DEMPath">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>170</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_5">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>223</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>SAR Dir</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="SARDir">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>220</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::GetDirectory</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_6">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>273</y>
+       <width>111</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Output Dir</string>
+     </property>
+    </widget>
+    <widget class="QgsFileWidget" name="OutputDir_2">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>270</y>
+       <width>451</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::GetDirectory</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_11">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>30</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Polarization</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="PolarizationList_2">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>30</y>
+       <width>67</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>HH</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>VV</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>HV</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>VH</string>
+      </property>
+     </item>
+    </widget>
+    <widget class="QComboBox" name="OrbitList_2">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>80</y>
+       <width>121</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <item>
+      <property name="text">
+       <string>Ascending</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Descending</string>
+      </property>
+     </item>
+    </widget>
+    <widget class="QLabel" name="label_14">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>80</y>
+       <width>101</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Orbit</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="logTab">
+    <attribute name="title">
+     <string>log</string>
+    </attribute>
+    <widget class="QTextEdit" name="plainTextEdit">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>20</y>
+       <width>581</width>
+       <height>141</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QProgressBar" name="progressBar">
+     <property name="geometry">
+      <rect>
+       <x>27</x>
+       <y>180</y>
+       <width>571</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="value">
+      <number>24</number>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="cancelButton">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>27</x>
+       <y>210</y>
+       <width>280</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Stop</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="closeButton">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>318</x>
+       <y>210</y>
+       <width>280</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Close</string>
+     </property>
+    </widget>
+   </widget>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsFileWidget</class>
+   <extends>QWidget</extends>
+   <header>qgsfilewidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>button_box</sender>
+   <signal>accepted()</signal>
+   <receiver>AzayakaPluginDialogBase</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>button_box</sender>
+   <signal>rejected()</signal>
+   <receiver>AzayakaPluginDialogBase</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
