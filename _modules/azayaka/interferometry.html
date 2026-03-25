@@ -1,0 +1,1525 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>azayaka.interferometry &mdash; Azayaka 0.1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=a58bc63e"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Azayaka
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">azayaka</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Azayaka</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">azayaka.interferometry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for azayaka.interferometry</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Azayaka: </span>
+<span class="sd">    Interferometry SAR Module.</span>
+<span class="sd">    This module provides functionalities for SAR interferometric processing and filtering.</span>
+
+<span class="sd">    Copyright (c) 2026 Syusuke Yasui, Yutaka Yamamoto, and contributors.</span>
+<span class="sd">    Licensed under the APGL-3.0 License.</span>
+
+<span class="sd">    Equation - Condition: No 1.xxx File.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.cm</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cm</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">shift</span><span class="p">,</span> <span class="n">uniform_filter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.interpolate</span><span class="w"> </span><span class="kn">import</span> <span class="n">RectBivariateSpline</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">geocode</span>
+
+
+<div class="viewcode-block" id="Interferometry">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Interferometry</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    SAR interferometry processing pipeline.</span>
+
+<span class="sd">    Provides coregistration, interferogram generation, filtering, and geocoding</span>
+<span class="sd">    utilities for a main/sub SLC pair.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Interferometry.__init__">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">main</span><span class="p">,</span> <span class="n">sub</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the interferometry workflow with main and sub SLC data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        main : object</span>
+<span class="sd">            Primary SAR reader instance.</span>
+<span class="sd">        sub : object</span>
+<span class="sd">            Secondary SAR reader instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">main</span> <span class="o">=</span> <span class="n">main</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sub</span> <span class="o">=</span> <span class="n">sub</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_align_signals_to_main</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_baseline_geometry</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._align_signals_to_main">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._align_signals_to_main">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_align_signals_to_main</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Align main and sub signals by cropping to the common shape.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">main_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">sub_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">if</span> <span class="n">main_shape</span> <span class="o">!=</span> <span class="n">sub_shape</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Warning: main/sub size mismatch. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Main: </span><span class="si">{</span><span class="n">main_shape</span><span class="si">}</span><span class="s2">, Sub: </span><span class="si">{</span><span class="n">sub_shape</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="p">)</span>
+        <span class="n">target_shape</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">min</span><span class="p">(</span><span class="n">main_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sub_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="nb">min</span><span class="p">(</span><span class="n">main_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sub_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+        <span class="p">)</span>
+        <span class="c1"># Crop to the common area to avoid allocating padded arrays.</span>
+        <span class="c1"># Equation - Condition: No 1.1</span>
+        <span class="c1"># # Select the minimum (Azimuth Sample, Range Sample) between main and sub.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">signal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">signal</span><span class="p">[:</span> <span class="n">target_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],:</span> <span class="n">target_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span><span class="p">[:</span> <span class="n">target_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],:</span> <span class="n">target_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Aligned main/sub signals to shape: </span><span class="si">{</span><span class="n">target_shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._init_baseline_geometry">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._init_baseline_geometry">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_baseline_geometry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">baseline_offset</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute baseline geometry between main and sub orbits.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        baseline_offset : float, optional</span>
+<span class="sd">            Offset added to the perpendicular baseline component.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Parameter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_offset</span> <span class="o">=</span> <span class="n">baseline_offset</span>
+        
+        <span class="n">num_aperture_sample</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">NUM_APERTURE_SAMPLE</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">NUM_APERTURE_SAMPLE</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_aperture_sample</span> <span class="o">=</span> <span class="n">num_aperture_sample</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_pixel</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">NUM_PIXEL</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">NUM_PIXEL</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">],</span>
+            <span class="p">],</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># Equation - Condition: No 1.2</span>
+        <span class="c1"># # Baseline := √(X² + Y² + Z²)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">baseline_xyz</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_xyz</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_xyz</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Equation - Condition: No 1.3</span>
+        <span class="c1"># # Slant Range Unit Vector := S / |S|</span>
+        <span class="n">slant_range_unit_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_X_SAT</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_SAT</span>
+        <span class="n">slant_range_unit_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Y_SAT</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_SAT</span>
+        <span class="n">slant_range_unit_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Z_SAT</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_SAT</span>
+
+        <span class="c1"># Equation - Condition: No 1.4</span>
+        <span class="c1"># # Correct 3D Geometry directions -&gt; Ascending and Longitude consideration</span>
+        <span class="n">baseline_sign</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_earth_sign</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">],</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">,</span> <span class="s2">&quot;ORBIT_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        
+        <span class="c1"># Equation - Condition: No 1.5</span>
+        <span class="c1"># # Baseline Prependicular := (Baseline) ・ (S)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_vertical</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">])</span>
+            <span class="o">*</span> <span class="n">slant_range_unit_x</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span>
+            <span class="o">+</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">])</span>
+            <span class="o">*</span> <span class="n">slant_range_unit_y</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span>
+            <span class="o">+</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">])</span>
+            <span class="o">*</span> <span class="n">slant_range_unit_z</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span>
+        <span class="p">)</span>
+        
+        <span class="c1"># Equation - Condition: No 1.6</span>
+        <span class="c1"># # Baseline Horizontal := √(Baseline² - Baseline Perpendicular²)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_horizontal</span> <span class="o">=</span> <span class="n">baseline_sign</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_vertical</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Equation - Condition: No 1.7</span>
+        <span class="c1"># # Baseline Angle α := ArcTan(Baseline Perpendicular / Baseline Horizontal)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_angle_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">baseline_vertical</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_offset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_horizontal</span>
+        <span class="p">)</span>
+        <span class="c1"># Equation - Condition: No 1.8</span>
+        <span class="c1"># # Baseline Cosine/Sine α := Cosine/Sine(Baseline Angle α)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_cos_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_angle_alpha</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baseline_sin_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_angle_alpha</span><span class="p">)</span>
+        
+        <span class="c1"># Equation - Condition: No 1.9 from No 2.22</span>
+        <span class="c1"># # Height of Main Satellite</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">height_sat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">HEIGHT_SAT</span><span class="p">[:</span><span class="n">num_aperture_sample</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Initialized baseline geometry for interferometry processing.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._earth_sign">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._earth_sign">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_earth_sign</span><span class="p">(</span><span class="n">x_main</span><span class="p">,</span> <span class="n">y_main</span><span class="p">,</span> <span class="n">x_sub</span><span class="p">,</span> <span class="n">y_sub</span><span class="p">,</span> <span class="n">orbit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sign</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Determine the sign for baseline orientation.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        x_main, y_main : np.ndarray</span>
+<span class="sd">            Main satellite ECEF coordinates.</span>
+<span class="sd">        x_sub, y_sub : np.ndarray</span>
+<span class="sd">            Sub satellite ECEF coordinates.</span>
+<span class="sd">        orbit_name : str</span>
+<span class="sd">            Orbit direction label (e.g., &quot;A&quot;, &quot;D&quot;).</span>
+<span class="sd">        sign : int, optional</span>
+<span class="sd">            Initial sign value.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        int</span>
+<span class="sd">            Sign adjusted by orbit direction and relative longitude.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">longiture_main</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">y_main</span><span class="p">,</span> <span class="n">x_main</span><span class="p">)</span>
+        <span class="n">longiture_sub</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">y_sub</span><span class="p">,</span> <span class="n">x_sub</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">orbit_name</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;D&quot;</span><span class="p">:</span>
+            <span class="c1"># 衛星が南下軌道の場合</span>
+            <span class="n">sign</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">longiture_sub</span> <span class="o">&lt;</span> <span class="n">longiture_main</span><span class="p">):</span>
+            <span class="c1"># 地球の中心から見て、sub衛星がmain衛星よりも西側にある場合</span>
+            <span class="n">sign</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">return</span> <span class="n">sign</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._coherence_vectorized">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._coherence_vectorized">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_coherence_vectorized</span><span class="p">(</span>
+        <span class="n">clx_m</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">clx_s</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">mean_m_squared</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute local interferometric coherence.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        clx_m : np.ndarray</span>
+<span class="sd">            Main complex image.</span>
+<span class="sd">        clx_s : np.ndarray</span>
+<span class="sd">            Secondary complex image.</span>
+<span class="sd">        window_size : int</span>
+<span class="sd">            Window size for local averaging.</span>
+<span class="sd">        mean_m_squared : np.ndarray, optional</span>
+<span class="sd">            Precomputed mean of |clx_m|^2 for reuse.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Coherence map.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ifg</span> <span class="o">=</span> <span class="n">clx_m</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">clx_s</span><span class="p">)</span>
+        <span class="n">mean_ifg</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">ifg</span><span class="o">.</span><span class="n">real</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">uniform_filter</span><span class="p">(</span>
+            <span class="n">ifg</span><span class="o">.</span><span class="n">imag</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">mean_m_squared</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mean_m_squared</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">clx_m</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">)</span>
+        <span class="n">mean_s_squared</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">clx_s</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">)</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mean_m_squared</span> <span class="o">*</span> <span class="n">mean_s_squared</span><span class="p">)</span>
+
+        <span class="n">coherence</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">denominator</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">valid_mask</span> <span class="o">=</span> <span class="n">denominator</span> <span class="o">&gt;</span> <span class="mf">1e-10</span>
+        <span class="c1"># Equation - Condition: No 1.10</span>
+        <span class="c1"># # Coherence := |Σ(M * conj(S))| / sqrt(Σ(M²) * Σ(S²))</span>
+        <span class="n">coherence</span><span class="p">[</span><span class="n">valid_mask</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">mean_ifg</span><span class="p">[</span><span class="n">valid_mask</span><span class="p">])</span> <span class="o">/</span> <span class="n">denominator</span><span class="p">[</span><span class="n">valid_mask</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">coherence</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._coregistration_fine_coherence_vectorized">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._coregistration_fine_coherence_vectorized">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_coregistration_fine_coherence_vectorized</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">clx_m</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">clx_s</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">shift_range_min</span><span class="p">:</span> <span class="nb">int</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">shift_range_max</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">stride</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Estimate fine shifts by maximizing coherence.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        clx_m : np.ndarray</span>
+<span class="sd">            Main complex image.</span>
+<span class="sd">        clx_s : np.ndarray</span>
+<span class="sd">            Secondary complex image.</span>
+<span class="sd">        window_size : int, optional</span>
+<span class="sd">            Window size for coherence computation.</span>
+<span class="sd">        shift_range_min : int, optional</span>
+<span class="sd">            Minimum shift (pixels).</span>
+<span class="sd">        shift_range_max : int, optional</span>
+<span class="sd">            Maximum shift (pixels).</span>
+<span class="sd">        stride : int, optional</span>
+<span class="sd">            Sampling stride for sparse search.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        clx_s_reg : np.ndarray</span>
+<span class="sd">            Coregistered secondary image.</span>
+<span class="sd">        coh_best : np.ndarray</span>
+<span class="sd">            Best coherence map.</span>
+<span class="sd">        shift_map : tuple[np.ndarray, np.ndarray]</span>
+<span class="sd">            (azimuth_shift_map, range_shift_map).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">clx_m</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">clx_s</span> <span class="o">=</span> <span class="n">clx_s</span><span class="p">[:</span><span class="n">height</span><span class="p">,:</span><span class="n">width</span><span class="p">]</span>
+
+        <span class="n">shifts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">shift_range_min</span><span class="p">,</span> <span class="n">shift_range_max</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">h_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+        <span class="n">w_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+
+        <span class="n">h_shift_sparse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">h_points</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">w_points</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">w_shift_sparse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">h_points</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">w_points</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">coh_best_sparse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">h_points</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">w_points</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">clx_s_shifted</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">clx_s</span><span class="p">)</span>
+        <span class="n">mean_m_squared</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">clx_m</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;constant&quot;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">shifts</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Computing coherence shifts&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">h_shift</span> <span class="ow">in</span> <span class="n">shifts</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">w_shift</span> <span class="ow">in</span> <span class="n">shifts</span><span class="p">:</span>
+                    <span class="n">clx_s_shifted</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="n">src_h_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">h_shift</span><span class="p">)</span>
+                    <span class="n">src_h_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">height</span> <span class="o">-</span> <span class="n">h_shift</span><span class="p">)</span>
+                    <span class="n">src_w_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">w_shift</span><span class="p">)</span>
+                    <span class="n">src_w_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span> <span class="o">-</span> <span class="n">w_shift</span><span class="p">)</span>
+
+                    <span class="n">dst_h_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">h_shift</span><span class="p">)</span>
+                    <span class="n">dst_h_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="n">height</span> <span class="o">+</span> <span class="n">h_shift</span><span class="p">)</span>
+                    <span class="n">dst_w_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">w_shift</span><span class="p">)</span>
+                    <span class="n">dst_w_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">width</span> <span class="o">+</span> <span class="n">w_shift</span><span class="p">)</span>
+
+                    <span class="n">clx_s_shifted</span><span class="p">[</span><span class="n">dst_h_start</span><span class="p">:</span><span class="n">dst_h_end</span><span class="p">,</span> <span class="n">dst_w_start</span><span class="p">:</span><span class="n">dst_w_end</span><span class="p">]</span> <span class="o">=</span> <span class="n">clx_s</span><span class="p">[</span>
+                        <span class="n">src_h_start</span><span class="p">:</span><span class="n">src_h_end</span><span class="p">,</span> <span class="n">src_w_start</span><span class="p">:</span><span class="n">src_w_end</span>
+                    <span class="p">]</span>
+
+                    <span class="n">coherence_map</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_coherence_vectorized</span><span class="p">(</span>
+                        <span class="n">clx_m</span><span class="p">,</span>
+                        <span class="n">clx_s_shifted</span><span class="p">,</span>
+                        <span class="n">window_size</span><span class="p">,</span>
+                        <span class="n">mean_m_squared</span><span class="o">=</span><span class="n">mean_m_squared</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">coherence_points</span> <span class="o">=</span> <span class="n">coherence_map</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">h_points</span><span class="p">,</span> <span class="n">w_points</span><span class="p">)]</span>
+                    <span class="n">update_mask</span> <span class="o">=</span> <span class="n">coherence_points</span> <span class="o">&gt;</span> <span class="n">coh_best_sparse</span>
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">update_mask</span><span class="p">):</span>
+                        <span class="n">coh_best_sparse</span><span class="p">[</span><span class="n">update_mask</span><span class="p">]</span> <span class="o">=</span> <span class="n">coherence_points</span><span class="p">[</span><span class="n">update_mask</span><span class="p">]</span>
+                        <span class="n">h_shift_sparse</span><span class="p">[</span><span class="n">update_mask</span><span class="p">]</span> <span class="o">=</span> <span class="n">h_shift</span>
+                        <span class="n">w_shift_sparse</span><span class="p">[</span><span class="n">update_mask</span><span class="p">]</span> <span class="o">=</span> <span class="n">w_shift</span>
+                    <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">h_interp</span> <span class="o">=</span> <span class="n">RectBivariateSpline</span><span class="p">(</span><span class="n">h_points</span><span class="p">,</span> <span class="n">w_points</span><span class="p">,</span> <span class="n">h_shift_sparse</span><span class="p">,</span> <span class="n">kx</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ky</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">w_interp</span> <span class="o">=</span> <span class="n">RectBivariateSpline</span><span class="p">(</span><span class="n">h_points</span><span class="p">,</span> <span class="n">w_points</span><span class="p">,</span> <span class="n">w_shift_sparse</span><span class="p">,</span> <span class="n">kx</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ky</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">coh_interp</span> <span class="o">=</span> <span class="n">RectBivariateSpline</span><span class="p">(</span><span class="n">h_points</span><span class="p">,</span> <span class="n">w_points</span><span class="p">,</span> <span class="n">coh_best_sparse</span><span class="p">,</span> <span class="n">kx</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ky</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">h_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">height</span><span class="p">)</span>
+        <span class="n">w_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">width</span><span class="p">)</span>
+        <span class="n">h_shift_map</span> <span class="o">=</span> <span class="n">h_interp</span><span class="p">(</span><span class="n">h_full</span><span class="p">,</span> <span class="n">w_full</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">w_shift_map</span> <span class="o">=</span> <span class="n">w_interp</span><span class="p">(</span><span class="n">h_full</span><span class="p">,</span> <span class="n">w_full</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">coh_best</span> <span class="o">=</span> <span class="n">coh_interp</span><span class="p">(</span><span class="n">h_full</span><span class="p">,</span> <span class="n">w_full</span><span class="p">)</span>
+
+        <span class="n">clx_s_reg</span> <span class="o">=</span> <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_apply_shift_map</span><span class="p">(</span><span class="n">clx_s</span><span class="p">,</span> <span class="n">h_shift_map</span><span class="p">,</span> <span class="n">w_shift_map</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">clx_s_reg</span><span class="p">,</span> <span class="n">coh_best</span><span class="p">,</span> <span class="p">(</span><span class="n">h_shift_map</span><span class="p">,</span> <span class="n">w_shift_map</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._multilook_filter">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._multilook_filter">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_multilook_filter</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">looks_azimuth</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">looks_range</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply multilook averaging in azimuth and range.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Input image.</span>
+<span class="sd">        looks_azimuth : int</span>
+<span class="sd">            Number of looks in azimuth.</span>
+<span class="sd">        looks_range : int</span>
+<span class="sd">            Number of looks in range.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Filtered image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">looks_azimuth</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">looks_range</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">image</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">iscomplexobj</span><span class="p">(</span><span class="n">image</span><span class="p">):</span>
+            <span class="n">real</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">real</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">looks_azimuth</span><span class="p">,</span> <span class="n">looks_range</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+            <span class="n">imag</span> <span class="o">=</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">imag</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">looks_azimuth</span><span class="p">,</span> <span class="n">looks_range</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">real</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">imag</span>
+        <span class="k">return</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">looks_azimuth</span><span class="p">,</span> <span class="n">looks_range</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._convolve2d">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._convolve2d">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convolve2d</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kernel</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Perform a valid 2D convolution using stride tricks.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Input image.</span>
+<span class="sd">        kernel : np.ndarray</span>
+<span class="sd">            Convolution kernel.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Convolved output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">+</span> <span class="n">kernel</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">strides</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">strides</span> <span class="o">*</span> <span class="mi">2</span>
+        <span class="n">strided_image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">stride_tricks</span><span class="o">.</span><span class="n">as_strided</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">strides</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;kl,ijkl-&gt;ij&quot;</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">strided_image</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._pad_singlechannel_image">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._pad_singlechannel_image">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pad_singlechannel_image</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kernel_shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pad a single-channel image for convolution.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Input image.</span>
+<span class="sd">        kernel_shape : tuple[int, int]</span>
+<span class="sd">            Kernel shape.</span>
+<span class="sd">        boundary : str</span>
+<span class="sd">            Padding mode passed to `np.pad`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Padded image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
+            <span class="n">image</span><span class="p">,</span>
+            <span class="p">((</span><span class="nb">int</span><span class="p">(</span><span class="n">kernel_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),),</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">kernel_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),)),</span>
+            <span class="n">boundary</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._convolve2d_safe">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._convolve2d_safe">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convolve2d_safe</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kernel</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s2">&quot;edge&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convolve with padding to preserve size.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Input image.</span>
+<span class="sd">        kernel : np.ndarray</span>
+<span class="sd">            Convolution kernel.</span>
+<span class="sd">        boundary : str, optional</span>
+<span class="sd">            Padding mode. If empty, no padding is applied.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Convolved output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pad_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_pad_singlechannel_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">kernel</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">boundary</span><span class="p">)</span> <span class="k">if</span> <span class="n">boundary</span> <span class="k">else</span> <span class="n">image</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_convolve2d</span><span class="p">(</span><span class="n">pad_image</span><span class="p">,</span> <span class="n">kernel</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._create_averaging_kernel">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._create_averaging_kernel">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_averaging_kernel</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a normalized averaging kernel.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        size : tuple[int, int]</span>
+<span class="sd">            Kernel size.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Averaging kernel.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._goldstein_filter_patch">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._goldstein_filter_patch">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_goldstein_filter_patch</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">filter_kernel</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply Goldstein phase filtering to a single patch.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        patch : np.ndarray</span>
+<span class="sd">            Complex input patch.</span>
+<span class="sd">        alpha : float</span>
+<span class="sd">            Goldstein filter exponent.</span>
+<span class="sd">        filter_kernel : np.ndarray</span>
+<span class="sd">            Smoothing kernel in frequency domain.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Filtered patch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Goldstein Phase Filter for a single patch</span>
+        <span class="c1"># Equation - Condition: No 1.16</span>
+        <span class="c1"># # Goldstein Filtered Patch := IFFT{ FFT{Patch} * |FFT{Patch} * H_conj|^α }</span>
+        <span class="n">patch_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft2</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
+        <span class="n">patch_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftshift</span><span class="p">(</span><span class="n">patch_fft</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">alpha</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">smooth</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_convolve2d_safe</span><span class="p">(</span><span class="n">patch_fft</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">filter_kernel</span><span class="p">))</span>
+            <span class="n">amp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">smooth</span><span class="p">)</span> <span class="o">**</span> <span class="n">alpha</span>
+            <span class="n">patch_fft</span> <span class="o">=</span> <span class="n">patch_fft</span> <span class="o">*</span> <span class="n">amp</span>
+        <span class="n">patch_fft</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifftshift</span><span class="p">(</span><span class="n">patch_fft</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft2</span><span class="p">(</span><span class="n">patch_fft</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._goldstein_phase_filter">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._goldstein_phase_filter">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_goldstein_phase_filter</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+        <span class="n">patch_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">filter_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply Goldstein phase filtering over an image.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Complex interferogram or phase image.</span>
+<span class="sd">        alpha : float, optional</span>
+<span class="sd">            Goldstein exponent.</span>
+<span class="sd">        patch_size : int, optional</span>
+<span class="sd">            Patch size for local filtering.</span>
+<span class="sd">        step : int, optional</span>
+<span class="sd">            Step size for patch traversal.</span>
+<span class="sd">        filter_size : int, optional</span>
+<span class="sd">            Size of averaging kernel for smoothing.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Filtered image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">patch_size</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">image</span>
+        <span class="n">filter_kernel</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_create_averaging_kernel</span><span class="p">((</span><span class="n">filter_size</span><span class="p">,</span> <span class="n">filter_size</span><span class="p">))</span>
+        <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">height</span> <span class="o">-</span> <span class="n">patch_size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">step</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Goldstein filter&quot;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">width</span> <span class="o">-</span> <span class="n">patch_size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">step</span><span class="p">):</span>
+                <span class="n">patch</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="n">y</span><span class="p">:</span> <span class="n">y</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">]</span>
+                <span class="n">filtered</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_goldstein_filter_patch</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">filter_kernel</span><span class="p">)</span>
+                <span class="n">output</span><span class="p">[</span><span class="n">y</span><span class="p">:</span> <span class="n">y</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">]</span> <span class="o">+=</span> <span class="n">filtered</span>
+                <span class="n">count</span><span class="p">[</span><span class="n">y</span><span class="p">:</span> <span class="n">y</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">+</span> <span class="n">patch_size</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span>
+
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">output</span><span class="p">[</span><span class="n">valid</span><span class="p">]</span> <span class="o">/=</span> <span class="n">count</span><span class="p">[</span><span class="n">valid</span><span class="p">]</span>
+        <span class="n">output</span><span class="p">[</span><span class="o">~</span><span class="n">valid</span><span class="p">]</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="o">~</span><span class="n">valid</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._compute_topography_phase">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._compute_topography_phase">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_topography_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dem_radar</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simulate topography phase for the full radar grid.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dem_radar : np.ndarray</span>
+<span class="sd">            DEM resampled to radar coordinates.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Complex topography phase screen.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dem_radar</span> <span class="o">=</span> <span class="n">dem_radar</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_aperture_sample</span><span class="p">,:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_pixel</span><span class="p">]</span>
+        <span class="n">height_main_observation</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">DIS_ELLIPSOID_RADIUS</span> <span class="o">+</span> <span class="n">dem_radar</span>
+
+        <span class="n">slant_range_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_aperture_sample</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_pixel</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">slant_range</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span>
+
+        <span class="k">for</span> <span class="n">idx_line</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_aperture_sample</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Topography phase&quot;</span><span class="p">):</span>
+            
+            <span class="c1"># Equation - Condition: No 1.11</span>
+            <span class="c1"># # Height Cosine = (R² + H_sub² - H_main_obs²) / (2 * R * H_sub)</span>
+            <span class="c1"># # Height Sine = √(1 - Cosine²)</span>
+            <span class="n">height_sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">DIS_ELLIPSOID_RADIUS</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">height_sat</span><span class="p">[</span><span class="n">idx_line</span><span class="p">]</span>
+            <span class="n">height_cos_theta</span> <span class="o">=</span> <span class="p">(</span><span class="n">slant_range</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">height_sub</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">height_main_observation</span><span class="p">[</span><span class="n">idx_line</span><span class="p">,:]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> \
+                <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">slant_range</span> <span class="o">*</span> <span class="n">height_sub</span><span class="p">)</span>
+            <span class="n">height_sin_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">height_cos_theta</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span>
+            
+            <span class="c1"># Equation - Condition: No 1.12</span>
+            <span class="c1"># # Topography Phase Simulation = R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))</span>
+            <span class="n">topography_phase_simulation</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">slant_range</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline</span><span class="p">[</span><span class="n">idx_line</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">-</span><span class="mf">2.0</span>
+                <span class="o">*</span> <span class="n">slant_range</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline</span><span class="p">[</span><span class="n">idx_line</span><span class="p">]</span>
+                <span class="o">*</span> <span class="p">(</span>
+                    <span class="n">height_sin_theta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_cos_alpha</span><span class="p">[</span><span class="n">idx_line</span><span class="p">]</span>
+                    <span class="o">-</span><span class="n">height_cos_theta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_sin_alpha</span><span class="p">[</span><span class="n">idx_line</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_offset</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="p">)</span>
+            <span class="n">topography_phase_simulation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">topography_phase_simulation</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+            
+            <span class="c1"># Equation - Condition: No 1.13</span>
+            <span class="c1"># # Δ Slant Range ΔS := -R + √(Topography Phase Simulation)</span>
+            <span class="n">slant_range_delta</span><span class="p">[</span><span class="n">idx_line</span><span class="p">,:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">slant_range</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">topography_phase_simulation</span><span class="p">)</span>
+
+        <span class="c1"># Equation - Condition: No 1.14</span>
+        <span class="c1"># # Topography Phase := exp(j * -4π / λ * ΔS)</span>
+        <span class="n">topography</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">LAMBDA</span> <span class="o">*</span> <span class="n">slant_range_delta</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">slant_range_delta</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">topography</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._compute_topography_phase_cropped">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._compute_topography_phase_cropped">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_topography_phase_cropped</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dem_radar_crop</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">top_az</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simulate topography phase for a cropped radar window.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dem_radar_crop : np.ndarray</span>
+<span class="sd">            Cropped DEM in radar coordinates.</span>
+<span class="sd">        top_az : int</span>
+<span class="sd">            Top azimuth index of the crop in the full grid.</span>
+<span class="sd">        left_rg : int</span>
+<span class="sd">            Left range index of the crop in the full grid.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Complex topography phase screen for the crop.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">crop_lines</span><span class="p">,</span> <span class="n">crop_pixels</span> <span class="o">=</span> <span class="n">dem_radar_crop</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">slant_range</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span><span class="p">[</span><span class="n">left_rg</span><span class="p">:</span> <span class="n">left_rg</span> <span class="o">+</span> <span class="n">crop_pixels</span><span class="p">]</span>
+        <span class="n">height_main_observation</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">DIS_ELLIPSOID_RADIUS</span> <span class="o">+</span> <span class="n">dem_radar_crop</span>
+
+        <span class="n">slant_range_delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">crop_lines</span><span class="p">,</span> <span class="n">crop_pixels</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">idx_line</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">crop_lines</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Topography phase (crop)&quot;</span><span class="p">):</span>
+            <span class="n">az_idx</span> <span class="o">=</span> <span class="n">top_az</span> <span class="o">+</span> <span class="n">idx_line</span>
+            
+            <span class="c1"># Equation - Condition: No 1.11</span>
+            <span class="c1"># # Height Cosine/Sine := (R² + H_sub² - H_main²) / (2 * R * H_sub)</span>
+            <span class="n">height_sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">DIS_ELLIPSOID_RADIUS</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">height_sat</span><span class="p">[</span><span class="n">az_idx</span><span class="p">]</span>
+            <span class="n">height_cos_theta</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">slant_range</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">+</span><span class="n">height_sub</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">-</span><span class="n">height_main_observation</span><span class="p">[</span><span class="n">idx_line</span><span class="p">,:]</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">slant_range</span> <span class="o">*</span> <span class="n">height_sub</span><span class="p">)</span>
+            <span class="n">height_sin_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">height_cos_theta</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span>
+
+            <span class="c1"># Equation - Condition: No 1.12</span>
+            <span class="c1"># # Topography Phase Simulation := R² + B² - 2 * R * B * (Sin(θ) * Cos(α) - Cos(θ) * Sin(α))</span>
+            <span class="n">topography_phase_simulation</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">slant_range</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline</span><span class="p">[</span><span class="n">az_idx</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">-</span><span class="mf">2.0</span>
+                <span class="o">*</span> <span class="n">slant_range</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline</span><span class="p">[</span><span class="n">az_idx</span><span class="p">]</span>
+                <span class="o">*</span> <span class="p">(</span>
+                    <span class="n">height_sin_theta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_cos_alpha</span><span class="p">[</span><span class="n">az_idx</span><span class="p">]</span>
+                    <span class="o">-</span><span class="n">height_cos_theta</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_sin_alpha</span><span class="p">[</span><span class="n">az_idx</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">baseline_offset</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="p">)</span>
+            <span class="n">topography_phase_simulation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">topography_phase_simulation</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+            
+            <span class="c1"># Equation - Condition: No 1.13</span>
+            <span class="c1"># # Δ Slant Range ΔS := -R + √(Topography Phase Simulation)</span>
+            <span class="n">slant_range_delta</span><span class="p">[</span><span class="n">idx_line</span><span class="p">,:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">slant_range</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">topography_phase_simulation</span><span class="p">)</span>
+
+        <span class="c1"># Equation - Condition: No 1.14</span>
+        <span class="c1"># # Topography Phase := exp(j * -4π / λ * ΔS)</span>
+        <span class="n">topography</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
+            <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">LAMBDA</span> <span class="o">*</span> <span class="n">slant_range_delta</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">slant_range_delta</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">topography</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._pad_to_shape">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._pad_to_shape">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pad_to_shape</span><span class="p">(</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">target_shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">fill_value</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pad an array to a target shape.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data : np.ndarray</span>
+<span class="sd">            Input array.</span>
+<span class="sd">        target_shape : tuple[int, int]</span>
+<span class="sd">            Desired output shape.</span>
+<span class="sd">        fill_value : scalar</span>
+<span class="sd">            Fill value for padded regions.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Padded array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Equation - Condition: No 1.15</span>
+        <span class="c1"># # Pad data to target shape with fill_value</span>
+        <span class="n">padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">target_shape</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">target_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">target_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">padded</span><span class="p">[:</span><span class="n">height</span><span class="p">,:</span><span class="n">width</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="n">height</span><span class="p">,:</span><span class="n">width</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">padded</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._coregister_slc">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._coregister_slc">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_coregister_slc</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">slc_main</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">slc_sub</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">fine</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">coherence_window</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">fine_shift_range</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">fine_stride</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">coarse_downsample</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coregister a secondary SLC to the main SLC.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        slc_main : np.ndarray</span>
+<span class="sd">            Main SLC image.</span>
+<span class="sd">        slc_sub : np.ndarray</span>
+<span class="sd">            Secondary SLC image.</span>
+<span class="sd">        fine : bool, optional</span>
+<span class="sd">            Whether to perform fine coregistration.</span>
+<span class="sd">        coherence_window : int, optional</span>
+<span class="sd">            Window size for coherence computation.</span>
+<span class="sd">        fine_shift_range : int, optional</span>
+<span class="sd">            Search range (pixels) for fine shifts.</span>
+<span class="sd">        fine_stride : int, optional</span>
+<span class="sd">            Stride for fine shift search.</span>
+<span class="sd">        coarse_downsample : int, optional</span>
+<span class="sd">            Downsample factor for coarse phase correlation.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        slc_sub_reg : np.ndarray</span>
+<span class="sd">            Coregistered secondary SLC.</span>
+<span class="sd">        coherence_reg : np.ndarray</span>
+<span class="sd">            Coherence after registration.</span>
+<span class="sd">        coarse_shift : tuple[float, float]</span>
+<span class="sd">            Coarse (range, azimuth) shift estimate.</span>
+<span class="sd">        shift_map : tuple[np.ndarray, np.ndarray]</span>
+<span class="sd">            Fine per-pixel shift maps (azimuth, range).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">intensity_main</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">slc_main</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">intensity_main</span> <span class="o">*=</span> <span class="n">intensity_main</span>
+        <span class="n">intensity_sub</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">slc_sub</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">intensity_sub</span> <span class="o">*=</span> <span class="n">intensity_sub</span>
+
+        <span class="k">if</span> <span class="n">coarse_downsample</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">intensity_main</span> <span class="o">=</span> <span class="n">intensity_main</span><span class="p">[::</span><span class="n">coarse_downsample</span><span class="p">,::</span><span class="n">coarse_downsample</span><span class="p">]</span>
+            <span class="n">intensity_sub</span> <span class="o">=</span> <span class="n">intensity_sub</span><span class="p">[::</span><span class="n">coarse_downsample</span><span class="p">,::</span><span class="n">coarse_downsample</span><span class="p">]</span>
+
+        <span class="c1"># Convert to dB scale</span>
+        <span class="c1"># Equation - Condition: No 1.17</span>
+        <span class="c1"># # Intensity (dB) := 10 * log10(Intensity^2) + Adjustment</span>
+        <span class="n">intensity_main</span> <span class="o">=</span> <span class="mf">20.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">intensity_main</span><span class="p">,</span> <span class="n">a_min</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">a_max</span><span class="o">=</span><span class="mf">1e10</span><span class="p">))</span> <span class="o">-</span> <span class="mf">10.0</span>
+        <span class="n">intensity_sub</span> <span class="o">=</span> <span class="mf">20.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">intensity_sub</span><span class="p">,</span> <span class="n">a_min</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">a_max</span><span class="o">=</span><span class="mf">1e10</span><span class="p">))</span> <span class="o">-</span> <span class="mf">10.0</span>
+
+        <span class="c1"># Coarse coregistration using phase correlation</span>
+        <span class="c1"># Equation - Condition: No 1.18</span>
+        <span class="c1"># # F_k(χ,η) =F {f_k(x,y)} (k=1,2)</span>
+        <span class="c1"># # Shift(Δx,Δy) = argmax_(χ,η) { |F_1(χ,η) * F_2_conj(χ,η)| / (|F_1(χ,η)| * |F_2(χ,η)|) }</span>
+        <span class="n">difference</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">phaseCorrelate</span><span class="p">(</span><span class="n">intensity_main</span><span class="p">,</span> <span class="n">intensity_sub</span><span class="p">)</span>
+        <span class="n">shift_range</span><span class="p">,</span> <span class="n">shift_azimuth</span> <span class="o">=</span> <span class="n">difference</span>
+        <span class="k">if</span> <span class="n">coarse_downsample</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">shift_range</span> <span class="o">*=</span> <span class="n">coarse_downsample</span>
+            <span class="n">shift_azimuth</span> <span class="o">*=</span> <span class="n">coarse_downsample</span>
+
+        <span class="n">slc_sub_coarse</span> <span class="o">=</span> <span class="n">shift</span><span class="p">(</span>
+            <span class="n">slc_sub</span><span class="p">,</span>
+            <span class="n">shift</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="n">shift_azimuth</span><span class="p">,</span> <span class="o">-</span><span class="n">shift_range</span><span class="p">),</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">del</span> <span class="n">intensity_main</span>
+        <span class="k">del</span> <span class="n">intensity_sub</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">fine</span><span class="p">:</span>
+            <span class="n">slc_sub_fine</span><span class="p">,</span> <span class="n">coherence_reg</span><span class="p">,</span> <span class="n">shift_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_coregistration_fine_coherence_vectorized</span><span class="p">(</span>
+                <span class="n">slc_main</span><span class="p">,</span>
+                <span class="n">slc_sub_coarse</span><span class="p">,</span>
+                <span class="n">window_size</span><span class="o">=</span><span class="n">coherence_window</span><span class="p">,</span>
+                <span class="n">shift_range_min</span><span class="o">=-</span><span class="n">fine_shift_range</span><span class="p">,</span>
+                <span class="n">shift_range_max</span><span class="o">=</span><span class="n">fine_shift_range</span><span class="p">,</span>
+                <span class="n">stride</span><span class="o">=</span><span class="n">fine_stride</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">slc_sub_fine</span> <span class="o">=</span> <span class="n">slc_sub_coarse</span>
+            <span class="n">coherence_reg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_coherence_vectorized</span><span class="p">(</span>
+                <span class="n">slc_main</span><span class="p">,</span>
+                <span class="n">slc_sub_fine</span><span class="p">,</span>
+                <span class="n">window_size</span><span class="o">=</span><span class="n">coherence_window</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">shift_map</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">slc_sub_fine</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">slc_sub_fine</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">slc_sub_fine</span><span class="p">,</span> <span class="n">coherence_reg</span><span class="p">,</span> <span class="p">(</span><span class="n">shift_range</span><span class="p">,</span> <span class="n">shift_azimuth</span><span class="p">),</span> <span class="n">shift_map</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._prepare_geocode_registration">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._prepare_geocode_registration">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_geocode_registration</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">geocoder</span><span class="p">:</span> <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="p">,</span>
+        <span class="n">signal</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">dem_coreg_window_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dem_coreg_shift_range</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dem_coreg_stride</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute DEM-based registration parameters for geocoding.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        geocoder : Geocode</span>
+<span class="sd">            Geocode helper instance.</span>
+<span class="sd">        signal : np.ndarray</span>
+<span class="sd">            Radar-domain signal used for registration.</span>
+<span class="sd">        dem_coreg_window_size : int</span>
+<span class="sd">            Window size for DEM-to-image correlation.</span>
+<span class="sd">        dem_coreg_shift_range : int</span>
+<span class="sd">            Search range (pixels) for DEM registration.</span>
+<span class="sd">        dem_coreg_stride : int</span>
+<span class="sd">            Sampling stride for the correlation search.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Registration metadata including crop window and shift maps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dem_radar_smooth</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_geocode_dem_to_radar_smooth</span><span class="p">(</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">dem</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">idx_azimuth</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">idx_range</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">NUM_APERTURE_SAMPLE</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">NUM_PIXEL</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">idx_az_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">idx_azimuth</span><span class="p">))</span>
+        <span class="n">idx_az_max</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">idx_azimuth</span><span class="p">))</span>
+        <span class="n">idx_rg_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">idx_range</span><span class="p">))</span>
+        <span class="n">idx_rg_max</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">idx_range</span><span class="p">))</span>
+
+        <span class="n">top_az</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">idx_az_min</span> <span class="o">-</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">buffer_sample</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">bot_az</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">idx_az_max</span> <span class="o">+</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">buffer_sample</span><span class="p">,</span> <span class="n">dem_radar_smooth</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">left_rg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">idx_rg_min</span> <span class="o">-</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">buffer_sample</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">right_rg</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">idx_rg_max</span> <span class="o">+</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">buffer_sample</span><span class="p">,</span> <span class="n">dem_radar_smooth</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">top_az</span> <span class="o">&gt;=</span> <span class="n">bot_az</span> <span class="ow">or</span> <span class="n">left_rg</span> <span class="o">&gt;=</span> <span class="n">right_rg</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No overlap between radar coordinates and DEM after cropping&quot;</span><span class="p">)</span>
+
+        <span class="n">dem_radar_smooth_cropped</span> <span class="o">=</span> <span class="n">dem_radar_smooth</span><span class="p">[</span><span class="n">top_az</span><span class="p">:</span><span class="n">bot_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">:</span><span class="n">right_rg</span><span class="p">]</span>
+        
+        <span class="k">del</span> <span class="n">dem_radar_smooth</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+        
+        <span class="c1"># DEM gradient computation</span>
+        <span class="c1"># Equation - Condition: No 1.19</span>
+        <span class="c1"># # DEM Gradient Range := DEM_Radar(x, y+1) - DEM_Radar(x, y-1)</span>
+        <span class="n">dem_gradient_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">dem_radar_smooth_cropped</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">dem_gradient_range</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dem_radar_smooth_cropped</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">-</span> <span class="n">dem_radar_smooth_cropped</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="n">signal_crop</span> <span class="o">=</span> <span class="n">signal</span><span class="p">[</span><span class="n">top_az</span><span class="p">:</span><span class="n">bot_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">:</span><span class="n">right_rg</span><span class="p">]</span>
+        <span class="c1"># Convert to intensity in dB scale</span>
+        <span class="c1"># Equation - Condition: No 1.17 (repeated)</span>
+        <span class="n">intensity_crop</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="mf">20.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">signal_crop</span><span class="p">),</span> <span class="n">a_min</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">a_max</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span> <span class="o">-</span> <span class="mf">10.0</span>
+        <span class="p">)</span>
+        
+        <span class="k">del</span> <span class="n">signal_crop</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+        
+        <span class="c1"># Equation - Condition: No 1.18 (repeated)</span>
+        <span class="n">difference</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">phaseCorrelate</span><span class="p">(</span>
+            <span class="n">dem_gradient_range</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span> <span class="n">intensity_crop</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">shift_range</span><span class="p">,</span> <span class="n">shift_azimuth</span> <span class="o">=</span> <span class="n">difference</span>
+        
+        <span class="k">del</span> <span class="n">_</span><span class="p">,</span> <span class="n">difference</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+        <span class="n">intensity_coarse</span> <span class="o">=</span> <span class="n">shift</span><span class="p">(</span>
+            <span class="n">intensity_crop</span><span class="p">,</span>
+            <span class="n">shift</span><span class="o">=</span><span class="p">(</span><span class="n">shift_azimuth</span><span class="p">,</span> <span class="n">shift_range</span><span class="p">),</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">fine_shift_map</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_coregistration_fine_correlation_vectorized</span><span class="p">(</span>
+            <span class="n">dem_gradient_range</span><span class="p">,</span>
+            <span class="n">intensity_coarse</span><span class="p">,</span>
+            <span class="n">window_size</span><span class="o">=</span><span class="n">dem_coreg_window_size</span><span class="p">,</span>
+            <span class="n">shift_range_min</span><span class="o">=-</span><span class="n">dem_coreg_shift_range</span><span class="p">,</span>
+            <span class="n">shift_range_max</span><span class="o">=</span><span class="n">dem_coreg_shift_range</span><span class="p">,</span>
+            <span class="n">stride</span><span class="o">=</span><span class="n">dem_coreg_stride</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">del</span> <span class="n">dem_gradient_range</span>
+        <span class="k">del</span> <span class="n">intensity_crop</span>
+        <span class="k">del</span> <span class="n">intensity_coarse</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;dem_radar_smooth&quot;</span><span class="p">:</span> <span class="n">dem_radar_smooth_cropped</span><span class="p">,</span>
+            <span class="s2">&quot;top_az&quot;</span><span class="p">:</span> <span class="n">top_az</span><span class="p">,</span>
+            <span class="s2">&quot;bot_az&quot;</span><span class="p">:</span> <span class="n">bot_az</span><span class="p">,</span>
+            <span class="s2">&quot;left_rg&quot;</span><span class="p">:</span> <span class="n">left_rg</span><span class="p">,</span>
+            <span class="s2">&quot;right_rg&quot;</span><span class="p">:</span> <span class="n">right_rg</span><span class="p">,</span>
+            <span class="s2">&quot;shift_range&quot;</span><span class="p">:</span> <span class="n">shift_range</span><span class="p">,</span>
+            <span class="s2">&quot;shift_azimuth&quot;</span><span class="p">:</span> <span class="n">shift_azimuth</span><span class="p">,</span>
+            <span class="s2">&quot;fine_shift_map&quot;</span><span class="p">:</span> <span class="n">fine_shift_map</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._apply_geocode_registration">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._apply_geocode_registration">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_geocode_registration</span><span class="p">(</span>
+        <span class="n">geocoder</span><span class="p">:</span> <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="p">,</span> <span class="n">radar_image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">registration</span><span class="p">:</span> <span class="n">Dict</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply registration parameters and geocode a radar image.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        geocoder : Geocode</span>
+<span class="sd">            Geocode helper instance.</span>
+<span class="sd">        radar_image : np.ndarray</span>
+<span class="sd">            Radar-domain image to transform.</span>
+<span class="sd">        registration : dict</span>
+<span class="sd">            Registration metadata from `_prepare_geocode_registration`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Geocoded image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">top_az</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;top_az&quot;</span><span class="p">]</span>
+        <span class="n">bot_az</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;bot_az&quot;</span><span class="p">]</span>
+        <span class="n">left_rg</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;left_rg&quot;</span><span class="p">]</span>
+        <span class="n">right_rg</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;right_rg&quot;</span><span class="p">]</span>
+        <span class="n">shift_range</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;shift_range&quot;</span><span class="p">]</span>
+        <span class="n">shift_azimuth</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;shift_azimuth&quot;</span><span class="p">]</span>
+        <span class="n">fine_shift_map</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;fine_shift_map&quot;</span><span class="p">]</span>
+
+        <span class="n">radar_crop</span> <span class="o">=</span> <span class="n">radar_image</span><span class="p">[</span><span class="n">top_az</span><span class="p">:</span><span class="n">bot_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">:</span><span class="n">right_rg</span><span class="p">]</span>
+        <span class="n">radar_crop</span> <span class="o">=</span> <span class="n">shift</span><span class="p">(</span>
+            <span class="n">radar_crop</span><span class="p">,</span>
+            <span class="n">shift</span><span class="o">=</span><span class="p">(</span><span class="n">shift_azimuth</span><span class="p">,</span> <span class="n">shift_range</span><span class="p">),</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">radar_crop</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_apply_shift_map</span><span class="p">(</span><span class="n">radar_crop</span><span class="p">,</span> <span class="n">fine_shift_map</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">fine_shift_map</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_geocode_radar_to_geo</span><span class="p">(</span><span class="n">radar_crop</span><span class="p">,</span> <span class="n">top_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._apply_geocode_registration_cropped">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._apply_geocode_registration_cropped">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_geocode_registration_cropped</span><span class="p">(</span>
+        <span class="n">geocoder</span><span class="p">:</span> <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="p">,</span> <span class="n">radar_crop</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">registration</span><span class="p">:</span> <span class="n">Dict</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Apply registration to a pre-cropped radar image and geocode.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        geocoder : Geocode</span>
+<span class="sd">            Geocode helper instance.</span>
+<span class="sd">        radar_crop : np.ndarray</span>
+<span class="sd">            Cropped radar-domain image.</span>
+<span class="sd">        registration : dict</span>
+<span class="sd">            Registration metadata from `_prepare_geocode_registration`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Geocoded image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">top_az</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;top_az&quot;</span><span class="p">]</span>
+        <span class="n">left_rg</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;left_rg&quot;</span><span class="p">]</span>
+        <span class="n">shift_range</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;shift_range&quot;</span><span class="p">]</span>
+        <span class="n">shift_azimuth</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;shift_azimuth&quot;</span><span class="p">]</span>
+        <span class="n">fine_shift_map</span> <span class="o">=</span> <span class="n">registration</span><span class="p">[</span><span class="s2">&quot;fine_shift_map&quot;</span><span class="p">]</span>
+
+        <span class="n">radar_crop</span> <span class="o">=</span> <span class="n">shift</span><span class="p">(</span>
+            <span class="n">radar_crop</span><span class="p">,</span>
+            <span class="n">shift</span><span class="o">=</span><span class="p">(</span><span class="n">shift_azimuth</span><span class="p">,</span> <span class="n">shift_range</span><span class="p">),</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">radar_crop</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_apply_shift_map</span><span class="p">(</span><span class="n">radar_crop</span><span class="p">,</span> <span class="n">fine_shift_map</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">fine_shift_map</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_geocode_radar_to_geo</span><span class="p">(</span><span class="n">radar_crop</span><span class="p">,</span> <span class="n">top_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._save_jpg">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._save_jpg">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_jpg</span><span class="p">(</span>
+        <span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">vmin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">vmax</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cmap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save an image to JPEG with optional colormap.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        image : np.ndarray</span>
+<span class="sd">            Input image.</span>
+<span class="sd">        path : str</span>
+<span class="sd">            Output file path.</span>
+<span class="sd">        vmin : float, optional</span>
+<span class="sd">            Minimum value for normalization.</span>
+<span class="sd">        vmax : float, optional</span>
+<span class="sd">            Maximum value for normalization.</span>
+<span class="sd">        cmap : str, optional</span>
+<span class="sd">            Matplotlib colormap name. If None, saves grayscale.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">vmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">vmin</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmin</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">vmax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">vmax</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmax</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">vmax</span> <span class="o">&lt;=</span> <span class="n">vmin</span><span class="p">:</span>
+            <span class="n">scaled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">scaled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">((</span><span class="n">image</span> <span class="o">-</span> <span class="n">vmin</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">vmax</span> <span class="o">-</span> <span class="n">vmin</span><span class="p">),</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cmap</span><span class="p">:</span>
+            <span class="n">colormap</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">get_cmap</span><span class="p">(</span><span class="n">cmap</span><span class="p">)</span>
+            <span class="n">rgb</span> <span class="o">=</span> <span class="p">(</span><span class="n">colormap</span><span class="p">(</span><span class="n">scaled</span><span class="p">)[</span><span class="o">...</span><span class="p">,:</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">bgr</span> <span class="o">=</span> <span class="n">rgb</span><span class="p">[</span><span class="o">...</span><span class="p">,::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">bgr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">gray</span> <span class="o">=</span> <span class="p">(</span><span class="n">scaled</span> <span class="o">*</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">gray</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry._save_histogram_jpg">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry._save_histogram_jpg">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_histogram_jpg</span><span class="p">(</span>
+        <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+        <span class="n">vmin</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">vmax</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save a histogram plot to JPEG.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        values : np.ndarray</span>
+<span class="sd">            Input values for histogram.</span>
+<span class="sd">        path : str</span>
+<span class="sd">            Output file path.</span>
+<span class="sd">        bins : int, optional</span>
+<span class="sd">            Number of histogram bins.</span>
+<span class="sd">        vmin : float, optional</span>
+<span class="sd">            Minimum histogram range.</span>
+<span class="sd">        vmax : float, optional</span>
+<span class="sd">            Maximum histogram range.</span>
+<span class="sd">        threshold : float, optional</span>
+<span class="sd">            Optional threshold indicator to draw on the histogram.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">valid</span><span class="p">]</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">(</span><span class="n">vmin</span><span class="p">,</span> <span class="n">vmax</span><span class="p">),</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#2b8cbe&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.85</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Coherence&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Count&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Coherence Histogram&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">threshold</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">threshold</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;threshold=</span><span class="si">{</span><span class="n">threshold</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper right&quot;</span><span class="p">)</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Interferometry.process">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.interferometry.Interferometry.process">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">dem_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dem_bounds</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dem_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dem_transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dem_crs</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s2">&quot;EPSG:4326&quot;</span><span class="p">,</span>
+        <span class="n">buffer_sample</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">look_direction</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s2">&quot;R&quot;</span><span class="p">,</span>
+        <span class="n">output_prefix</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s2">&quot;interferometry&quot;</span><span class="p">,</span>
+        <span class="n">fine_registration</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">coherence_window</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">fine_shift_range</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">fine_stride</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">multilook_azimuth</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="n">multilook_range</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">goldstein_alpha</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+        <span class="n">goldstein_patch_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+        <span class="n">goldstein_step</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+        <span class="n">goldstein_filter_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="n">coherence_threshold_quantile</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mf">3.0</span><span class="p">,</span>
+        <span class="n">coherence_histogram_threshold</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dem_coreg_window_size</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+        <span class="n">dem_coreg_shift_range</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">dem_coreg_stride</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">slc_coreg_coarse_downsample</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">sub_buffer</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the full interferometry processing pipeline and save outputs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        output_dir : str</span>
+<span class="sd">            Output directory for GeoTIFF/JPEG products.</span>
+<span class="sd">        dem_path : str, optional</span>
+<span class="sd">            Path to DEM GeoTIFF.</span>
+<span class="sd">        dem_bounds : tuple[float, float, float, float], optional</span>
+<span class="sd">            DEM bounds (min_lon, min_lat, max_lon, max_lat).</span>
+<span class="sd">        dem_shape : tuple[int, int], optional</span>
+<span class="sd">            DEM shape (height, width).</span>
+<span class="sd">        dem_transform : rasterio.Affine, optional</span>
+<span class="sd">            DEM affine transform.</span>
+<span class="sd">        dem_crs : str, optional</span>
+<span class="sd">            DEM CRS (e.g., &quot;EPSG:4326&quot;).</span>
+<span class="sd">        buffer_sample : int, optional</span>
+<span class="sd">            Cropping buffer in radar samples.</span>
+<span class="sd">        look_direction : str, optional</span>
+<span class="sd">            Look direction (&quot;R&quot; or &quot;L&quot;).</span>
+<span class="sd">        output_prefix : str, optional</span>
+<span class="sd">            Prefix for output filenames.</span>
+<span class="sd">        fine_registration : bool, optional</span>
+<span class="sd">            Enable fine SLC coregistration.</span>
+<span class="sd">        coherence_window : int, optional</span>
+<span class="sd">            Window size for coherence estimation.</span>
+<span class="sd">        fine_shift_range : int, optional</span>
+<span class="sd">            Search range for fine SLC shifts.</span>
+<span class="sd">        fine_stride : int, optional</span>
+<span class="sd">            Stride for fine shift search.</span>
+<span class="sd">        multilook_azimuth : int, optional</span>
+<span class="sd">            Multilook factor in azimuth.</span>
+<span class="sd">        multilook_range : int, optional</span>
+<span class="sd">            Multilook factor in range.</span>
+<span class="sd">        goldstein_alpha : float, optional</span>
+<span class="sd">            Goldstein filter exponent.</span>
+<span class="sd">        goldstein_patch_size : int, optional</span>
+<span class="sd">            Patch size for Goldstein filtering.</span>
+<span class="sd">        goldstein_step : int, optional</span>
+<span class="sd">            Patch step for Goldstein filtering.</span>
+<span class="sd">        goldstein_filter_size : int, optional</span>
+<span class="sd">            Filter kernel size for Goldstein filtering.</span>
+<span class="sd">        coherence_threshold_quantile : float, optional</span>
+<span class="sd">            Quantile to threshold coherence.</span>
+<span class="sd">        coherence_histogram_threshold : float, optional</span>
+<span class="sd">            Explicit threshold for coherence masking.</span>
+<span class="sd">        dem_coreg_window_size : int, optional</span>
+<span class="sd">            Window size for DEM coregistration.</span>
+<span class="sd">        dem_coreg_shift_range : int, optional</span>
+<span class="sd">            Shift range for DEM coregistration.</span>
+<span class="sd">        dem_coreg_stride : int, optional</span>
+<span class="sd">            Stride for DEM coregistration.</span>
+<span class="sd">        slc_coreg_coarse_downsample : int, optional</span>
+<span class="sd">            Downsample factor for coarse SLC coregistration.</span>
+<span class="sd">        sub_buffer : int, optional</span>
+<span class="sd">            Buffer margin for sub-image cropping.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict[str, str]</span>
+<span class="sd">            Mapping of output product names to file paths.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">geocoder</span> <span class="o">=</span> <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="p">,</span>
+            <span class="n">dem_path</span><span class="o">=</span><span class="n">dem_path</span><span class="p">,</span>
+            <span class="n">dem_bounds</span><span class="o">=</span><span class="n">dem_bounds</span><span class="p">,</span>
+            <span class="n">dem_shape</span><span class="o">=</span><span class="n">dem_shape</span><span class="p">,</span>
+            <span class="n">dem_transform</span><span class="o">=</span><span class="n">dem_transform</span><span class="p">,</span>
+            <span class="n">dem_crs</span><span class="o">=</span><span class="n">dem_crs</span><span class="p">,</span>
+            <span class="n">buffer_sample</span><span class="o">=</span><span class="n">buffer_sample</span><span class="p">,</span>
+            <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">geocode_registration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_geocode_registration</span><span class="p">(</span>
+            <span class="n">geocoder</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">signal</span><span class="p">,</span>
+            <span class="n">dem_coreg_window_size</span><span class="o">=</span><span class="n">dem_coreg_window_size</span><span class="p">,</span>
+            <span class="n">dem_coreg_shift_range</span><span class="o">=</span><span class="n">dem_coreg_shift_range</span><span class="p">,</span>
+            <span class="n">dem_coreg_stride</span><span class="o">=</span><span class="n">dem_coreg_stride</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">dem_radar_crop</span> <span class="o">=</span> <span class="n">geocode_registration</span><span class="p">[</span><span class="s2">&quot;dem_radar_smooth&quot;</span><span class="p">]</span>
+        <span class="n">top_az</span> <span class="o">=</span> <span class="n">geocode_registration</span><span class="p">[</span><span class="s2">&quot;top_az&quot;</span><span class="p">]</span>
+        <span class="n">bot_az</span> <span class="o">=</span> <span class="n">geocode_registration</span><span class="p">[</span><span class="s2">&quot;bot_az&quot;</span><span class="p">]</span>
+        <span class="n">left_rg</span> <span class="o">=</span> <span class="n">geocode_registration</span><span class="p">[</span><span class="s2">&quot;left_rg&quot;</span><span class="p">]</span>
+        <span class="n">right_rg</span> <span class="o">=</span> <span class="n">geocode_registration</span><span class="p">[</span><span class="s2">&quot;right_rg&quot;</span><span class="p">]</span>
+
+        <span class="n">main_crop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">signal</span><span class="p">[</span><span class="n">top_az</span><span class="p">:</span><span class="n">bot_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">:</span><span class="n">right_rg</span><span class="p">]</span>
+        <span class="n">intensity_crop</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">main_crop</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="n">sub_top</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">top_az</span> <span class="o">-</span> <span class="n">sub_buffer</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">sub_bot</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">bot_az</span> <span class="o">+</span> <span class="n">sub_buffer</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">sub_left</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">left_rg</span> <span class="o">-</span> <span class="n">sub_buffer</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">sub_right</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">right_rg</span> <span class="o">+</span> <span class="n">sub_buffer</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">sub_crop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub</span><span class="o">.</span><span class="n">signal</span><span class="p">[</span><span class="n">sub_top</span><span class="p">:</span><span class="n">sub_bot</span><span class="p">,</span> <span class="n">sub_left</span><span class="p">:</span><span class="n">sub_right</span><span class="p">]</span>
+
+        <span class="n">main_offset_az</span> <span class="o">=</span> <span class="n">top_az</span> <span class="o">-</span> <span class="n">sub_top</span>
+        <span class="n">main_offset_rg</span> <span class="o">=</span> <span class="n">left_rg</span> <span class="o">-</span> <span class="n">sub_left</span>
+        <span class="n">main_padded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">sub_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">main_crop</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="n">main_padded</span><span class="p">[</span>
+            <span class="n">main_offset_az</span><span class="p">:</span> <span class="n">main_offset_az</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">main_offset_rg</span><span class="p">:</span> <span class="n">main_offset_rg</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="n">main_crop</span>
+
+        <span class="n">slc_sub_reg</span><span class="p">,</span> <span class="n">coherence_reg</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_coregister_slc</span><span class="p">(</span>
+            <span class="n">main_padded</span><span class="p">,</span>
+            <span class="n">sub_crop</span><span class="p">,</span>
+            <span class="n">fine</span><span class="o">=</span><span class="n">fine_registration</span><span class="p">,</span>
+            <span class="n">coherence_window</span><span class="o">=</span><span class="n">coherence_window</span><span class="p">,</span>
+            <span class="n">fine_shift_range</span><span class="o">=</span><span class="n">fine_shift_range</span><span class="p">,</span>
+            <span class="n">fine_stride</span><span class="o">=</span><span class="n">fine_stride</span><span class="p">,</span>
+            <span class="n">coarse_downsample</span><span class="o">=</span><span class="n">slc_coreg_coarse_downsample</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">slc_sub_reg_main</span> <span class="o">=</span> <span class="n">slc_sub_reg</span><span class="p">[</span>
+            <span class="n">main_offset_az</span><span class="p">:</span> <span class="n">main_offset_az</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">main_offset_rg</span><span class="p">:</span> <span class="n">main_offset_rg</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">]</span>
+        <span class="n">coherence_main</span> <span class="o">=</span> <span class="n">coherence_reg</span><span class="p">[</span>
+            <span class="n">main_offset_az</span><span class="p">:</span> <span class="n">main_offset_az</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">main_offset_rg</span><span class="p">:</span> <span class="n">main_offset_rg</span> <span class="o">+</span> <span class="n">main_crop</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="n">interferogram</span> <span class="o">=</span> <span class="n">main_crop</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">slc_sub_reg_main</span><span class="p">)</span>
+
+        <span class="n">topography_phase</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_topography_phase_cropped</span><span class="p">(</span><span class="n">dem_radar_crop</span><span class="p">,</span> <span class="n">top_az</span><span class="p">,</span> <span class="n">left_rg</span><span class="p">)</span>
+        <span class="n">interferogram_topo_removed</span> <span class="o">=</span> <span class="n">interferogram</span> <span class="o">*</span> <span class="n">topography_phase</span>
+
+        <span class="n">interferogram_topo_multilook</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_multilook_filter</span><span class="p">(</span>
+            <span class="n">interferogram_topo_removed</span><span class="p">,</span> <span class="n">multilook_azimuth</span><span class="p">,</span> <span class="n">multilook_range</span>
+        <span class="p">)</span>
+        <span class="n">interferogram_topo_filtered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_goldstein_phase_filter</span><span class="p">(</span>
+            <span class="n">interferogram_topo_multilook</span><span class="p">,</span>
+            <span class="n">alpha</span><span class="o">=</span><span class="n">goldstein_alpha</span><span class="p">,</span>
+            <span class="n">patch_size</span><span class="o">=</span><span class="n">goldstein_patch_size</span><span class="p">,</span>
+            <span class="n">step</span><span class="o">=</span><span class="n">goldstein_step</span><span class="p">,</span>
+            <span class="n">filter_size</span><span class="o">=</span><span class="n">goldstein_filter_size</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">coherence_for_hist</span> <span class="o">=</span> <span class="n">coherence_main</span>
+        <span class="n">coherence_threshold</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">finite</span> <span class="o">=</span> <span class="n">coherence_main</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">coherence_main</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">finite</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">thresholds</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">coherence_threshold_quantile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">thresholds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">finite</span><span class="p">,</span> <span class="n">coherence_threshold_quantile</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">coherence_histogram_threshold</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">thresholds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">coherence_histogram_threshold</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">thresholds</span><span class="p">:</span>
+                <span class="n">coherence_threshold</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">thresholds</span><span class="p">)</span>
+                <span class="n">mask</span> <span class="o">=</span> <span class="n">coherence_main</span> <span class="o">&gt;=</span> <span class="n">coherence_threshold</span>
+                <span class="n">intensity_crop</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">intensity_crop</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="n">interferogram</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">interferogram</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="n">interferogram_topo_removed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">interferogram_topo_removed</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="n">interferogram_topo_filtered</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">interferogram_topo_filtered</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="n">coherence_main</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">coherence_main</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+        <span class="n">geocode_intensity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_geocode_registration_cropped</span><span class="p">(</span>
+            <span class="n">geocoder</span><span class="p">,</span> <span class="n">intensity_crop</span><span class="p">,</span> <span class="n">geocode_registration</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">geocode_phase_initial</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_geocode_registration_cropped</span><span class="p">(</span>
+                <span class="n">geocoder</span><span class="p">,</span> <span class="n">interferogram</span><span class="p">,</span> <span class="n">geocode_registration</span>
+            <span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">geocode_phase_topo_removed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_geocode_registration_cropped</span><span class="p">(</span>
+                <span class="n">geocoder</span><span class="p">,</span> <span class="n">interferogram_topo_removed</span><span class="p">,</span> <span class="n">geocode_registration</span>
+            <span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">geocode_phase_topo_multilook</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_geocode_registration_cropped</span><span class="p">(</span>
+                <span class="n">geocoder</span><span class="p">,</span> <span class="n">interferogram_topo_filtered</span><span class="p">,</span> <span class="n">geocode_registration</span>
+            <span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">geocode_coherence</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_geocode_registration_cropped</span><span class="p">(</span>
+            <span class="n">geocoder</span><span class="p">,</span> <span class="n">coherence_main</span><span class="p">,</span> <span class="n">geocode_registration</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="k">del</span> <span class="n">main_padded</span>
+        <span class="k">del</span> <span class="n">sub_crop</span>
+        <span class="k">del</span> <span class="n">slc_sub_reg</span>
+        <span class="k">del</span> <span class="n">slc_sub_reg_main</span>
+        <span class="k">del</span> <span class="n">coherence_reg</span>
+        <span class="k">del</span> <span class="n">coherence_main</span>
+        <span class="k">del</span> <span class="n">interferogram</span>
+        <span class="k">del</span> <span class="n">interferogram_topo_removed</span>
+        <span class="k">del</span> <span class="n">interferogram_topo_multilook</span>
+        <span class="k">del</span> <span class="n">interferogram_topo_filtered</span>
+        <span class="k">del</span> <span class="n">intensity_crop</span>
+        <span class="k">del</span> <span class="n">topography_phase</span>
+        <span class="k">del</span> <span class="n">dem_radar_crop</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;intensity&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_intensity.tif&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;interferogram_phase&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_interferogram_phase.tif&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;topography_removed_phase&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_topography_removed_phase.tif&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;topography_removed_phase_multilook&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_topography_removed_phase_multilook.tif&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;coherence&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_coherence.tif&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;intensity_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_intensity.jpg&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;interferogram_phase_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_interferogram_phase.jpg&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;topography_removed_phase_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_topography_removed_phase.jpg&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;topography_removed_phase_multilook_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_topography_removed_phase_multilook.jpg&quot;</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;coherence_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_coherence.jpg&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;coherence_histogram_jpg&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_prefix</span><span class="si">}</span><span class="s2">_coherence_histogram.jpg&quot;</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_save_geotiff</span><span class="p">(</span><span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;intensity&quot;</span><span class="p">],</span> <span class="n">geocode_intensity</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">transform</span><span class="p">)</span>
+        <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_save_geotiff</span><span class="p">(</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;interferogram_phase&quot;</span><span class="p">],</span> <span class="n">geocode_phase_initial</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">transform</span>
+        <span class="p">)</span>
+        <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_save_geotiff</span><span class="p">(</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;topography_removed_phase&quot;</span><span class="p">],</span> <span class="n">geocode_phase_topo_removed</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">transform</span>
+        <span class="p">)</span>
+        <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_save_geotiff</span><span class="p">(</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;topography_removed_phase_multilook&quot;</span><span class="p">],</span>
+            <span class="n">geocode_phase_topo_multilook</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span>
+            <span class="n">geocoder</span><span class="o">.</span><span class="n">transform</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">geocode</span><span class="o">.</span><span class="n">Geocode</span><span class="o">.</span><span class="n">_save_geotiff</span><span class="p">(</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;coherence&quot;</span><span class="p">],</span> <span class="n">geocode_coherence</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">transform</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_jpg</span><span class="p">(</span><span class="n">geocode_intensity</span><span class="p">,</span> <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;intensity_jpg&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_jpg</span><span class="p">(</span>
+            <span class="n">geocode_phase_initial</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;interferogram_phase_jpg&quot;</span><span class="p">],</span>
+            <span class="n">vmin</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">vmax</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;hsv&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_jpg</span><span class="p">(</span>
+            <span class="n">geocode_phase_topo_removed</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;topography_removed_phase_jpg&quot;</span><span class="p">],</span>
+            <span class="n">vmin</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">vmax</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;hsv&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_jpg</span><span class="p">(</span>
+            <span class="n">geocode_phase_topo_multilook</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;topography_removed_phase_multilook_jpg&quot;</span><span class="p">],</span>
+            <span class="n">vmin</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">vmax</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;hsv&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_jpg</span><span class="p">(</span>
+            <span class="n">geocode_coherence</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;coherence_jpg&quot;</span><span class="p">],</span>
+            <span class="n">vmin</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+            <span class="n">vmax</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;inferno&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_histogram_jpg</span><span class="p">(</span>
+            <span class="n">coherence_for_hist</span><span class="p">,</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="s2">&quot;coherence_histogram_jpg&quot;</span><span class="p">],</span>
+            <span class="n">vmin</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+            <span class="n">vmax</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">threshold</span><span class="o">=</span><span class="n">coherence_threshold</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">outputs</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Syusuke Yasui, Yutaka Yamamoto.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

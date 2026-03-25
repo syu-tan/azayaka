@@ -1,0 +1,343 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>azayaka.utils &mdash; Azayaka 0.1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=a58bc63e"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Azayaka
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">azayaka</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Azayaka</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">azayaka.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for azayaka.utils</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Azayaka utility functions.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">rasterio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_bounds</span>
+
+
+<div class="viewcode-block" id="save_scene_kml">
+<a class="viewcode-back" href="../../azayaka.html#azayaka.utils.save_scene_kml">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_scene_kml</span><span class="p">(</span>
+    <span class="n">geocoder</span><span class="p">,</span>
+    <span class="n">output_kml_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">max_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+    <span class="n">look_direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">include_overlay</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overlay_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+    <span class="n">xyz2geo_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Export the SAR scene footprint to a KML file.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    geocoder : Geocode</span>
+<span class="sd">        Geocode instance containing SAR geometry and orbit information.</span>
+<span class="sd">    output_kml_path : str</span>
+<span class="sd">        Output path for the KML file.</span>
+<span class="sd">    max_iter : int, optional</span>
+<span class="sd">        Maximum iterations for the range-Doppler back-geocoding solver.</span>
+<span class="sd">    look_direction : str, optional</span>
+<span class="sd">        Look direction override (&quot;R&quot; or &quot;L&quot;). If None, uses the geocoder setting.</span>
+<span class="sd">    include_overlay : bool, optional</span>
+<span class="sd">        Whether to embed a downsampled intensity overlay.</span>
+<span class="sd">    overlay_size : int, optional</span>
+<span class="sd">        Output overlay size in pixels for both width and height.</span>
+<span class="sd">    xyz2geo_func : callable, optional</span>
+<span class="sd">        Function to convert ECEF XYZ to (lat, lon, height) in radians/meters.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list[tuple[float, float]]</span>
+<span class="sd">        Scene corners as (lat, lon) in degrees, ordered around the footprint.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If `xyz2geo_func` is not provided or computed corners are out of bounds.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">xyz2geo_func</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;xyz2geo_func is required.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">look_direction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">look_direction</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">look_direction</span>
+
+    <span class="n">corners</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_compute_scene_corners</span><span class="p">(</span><span class="n">max_iter</span><span class="o">=</span><span class="n">max_iter</span><span class="p">,</span> <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="ow">in</span> <span class="n">corners</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="o">-</span><span class="mf">90.0</span> <span class="o">&lt;=</span> <span class="n">lat</span> <span class="o">&lt;=</span> <span class="mf">90.0</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="p">(</span><span class="o">-</span><span class="mf">180.0</span> <span class="o">&lt;=</span> <span class="n">lon</span> <span class="o">&lt;=</span> <span class="mf">180.0</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Corner out of bounds: lat=</span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s2">, lon=</span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">scene_id</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="p">,</span> <span class="s2">&quot;PATH_CEOS_FOLDER&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">)</span>
+    <span class="n">scene_id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">scene_id</span><span class="p">)</span>
+
+    <span class="n">sat_start</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+    <span class="n">sat_end</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_X_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_Y_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">P_Z_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span>
+    <span class="n">sat_start_lat</span><span class="p">,</span> <span class="n">sat_start_lon</span><span class="p">,</span> <span class="n">sat_start_h</span> <span class="o">=</span> <span class="n">xyz2geo_func</span><span class="p">(</span><span class="n">sat_start</span><span class="p">)</span>
+    <span class="n">sat_end_lat</span><span class="p">,</span> <span class="n">sat_end_lon</span><span class="p">,</span> <span class="n">sat_end_h</span> <span class="o">=</span> <span class="n">xyz2geo_func</span><span class="p">(</span><span class="n">sat_end</span><span class="p">)</span>
+    <span class="n">sat_start_lat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">sat_start_lat</span><span class="p">))</span>
+    <span class="n">sat_start_lon</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">sat_start_lon</span><span class="p">))</span>
+    <span class="n">sat_start_h</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sat_start_h</span><span class="p">)</span>
+    <span class="n">sat_end_lat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">sat_end_lat</span><span class="p">))</span>
+    <span class="n">sat_end_lon</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">sat_end_lon</span><span class="p">))</span>
+    <span class="n">sat_end_h</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sat_end_h</span><span class="p">)</span>
+
+    <span class="n">near_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span><span class="p">))</span>
+    <span class="n">far_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span><span class="p">))</span>
+    <span class="n">near_range</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span><span class="p">[</span><span class="n">near_idx</span><span class="p">])</span>
+    <span class="n">far_range</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">SLANT_RANGE_SAMPLE</span><span class="p">[</span><span class="n">far_idx</span><span class="p">])</span>
+    <span class="n">sat_vel_start</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_X_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_Y_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_Z_SAT</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+    <span class="p">)</span>
+    <span class="n">sat_vel_end</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_X_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_Y_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">V_Z_SAT</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+    <span class="p">)</span>
+
+    <span class="n">near_start</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_range_doppler_back_geocode</span><span class="p">(</span>
+        <span class="n">sat_start</span><span class="p">,</span> <span class="n">sat_vel_start</span><span class="p">,</span> <span class="n">near_range</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="n">max_iter</span><span class="p">,</span> <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span>
+    <span class="p">)</span>
+    <span class="n">far_start</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_range_doppler_back_geocode</span><span class="p">(</span>
+        <span class="n">sat_start</span><span class="p">,</span> <span class="n">sat_vel_start</span><span class="p">,</span> <span class="n">far_range</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="n">max_iter</span><span class="p">,</span> <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span>
+    <span class="p">)</span>
+    <span class="n">near_end</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_range_doppler_back_geocode</span><span class="p">(</span>
+        <span class="n">sat_end</span><span class="p">,</span> <span class="n">sat_vel_end</span><span class="p">,</span> <span class="n">near_range</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="n">max_iter</span><span class="p">,</span> <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span>
+    <span class="p">)</span>
+    <span class="n">far_end</span> <span class="o">=</span> <span class="n">geocoder</span><span class="o">.</span><span class="n">_range_doppler_back_geocode</span><span class="p">(</span>
+        <span class="n">sat_end</span><span class="p">,</span> <span class="n">sat_vel_end</span><span class="p">,</span> <span class="n">far_range</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="n">max_iter</span><span class="p">,</span> <span class="n">look_direction</span><span class="o">=</span><span class="n">look_direction</span>
+    <span class="p">)</span>
+
+    <span class="n">overlay_href</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">include_overlay</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="p">,</span> <span class="s2">&quot;signal&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">intensity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="o">.</span><span class="n">signal</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">intensity</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">vmin</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">intensity</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="n">vmax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">intensity</span><span class="p">,</span> <span class="mi">98</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">vmax</span><span class="p">,</span> <span class="n">vmin</span><span class="p">):</span>
+                <span class="n">vmax</span> <span class="o">=</span> <span class="n">vmin</span> <span class="o">+</span> <span class="mf">1.0</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">intensity</span> <span class="o">-</span> <span class="n">vmin</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">vmax</span> <span class="o">-</span> <span class="n">vmin</span><span class="p">)</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">norm</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">norm</span> <span class="o">*</span> <span class="mf">255.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="n">resized</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">norm</span><span class="p">,</span> <span class="p">(</span><span class="n">overlay_size</span><span class="p">,</span> <span class="n">overlay_size</span><span class="p">),</span> <span class="n">interpolation</span><span class="o">=</span><span class="n">cv2</span><span class="o">.</span><span class="n">INTER_AREA</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">geocoder</span><span class="o">.</span><span class="n">sar</span><span class="p">,</span> <span class="s2">&quot;ORBIT_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;A&quot;</span><span class="p">:</span>
+                <span class="n">resized</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">resized</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">look_direction</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;L&quot;</span><span class="p">):</span>
+                <span class="n">resized</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">resized</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">overlay_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_kml_path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;_intensity.png&quot;</span>
+            <span class="n">cv2</span><span class="o">.</span><span class="n">imwrite</span><span class="p">(</span><span class="n">overlay_path</span><span class="p">,</span> <span class="n">resized</span><span class="p">)</span>
+            <span class="n">overlay_href</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">overlay_path</span><span class="p">)</span>
+
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s1">&#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;&lt;kml xmlns=&quot;http://www.opengis.net/kml/2.2&quot; xmlns:gx=&quot;http://www.google.com/kml/ext/2.2&quot;&gt;&#39;</span><span class="p">,</span>
+        <span class="s2">&quot;  &lt;Document&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;    &lt;name&gt;</span><span class="si">{</span><span class="n">scene_id</span><span class="si">}</span><span class="s2">&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Style id=</span><span class="se">\&quot;</span><span class="s2">scene_footprint_style</span><span class="se">\&quot;</span><span class="s2">&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;LineStyle&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;color&gt;ff0000ff&lt;/color&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;width&gt;2&lt;/width&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/LineStyle&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;PolyStyle&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;color&gt;7f0000ff&lt;/color&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;fill&gt;1&lt;/fill&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;outline&gt;1&lt;/outline&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/PolyStyle&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Style&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;satellite_start&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;Point&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_start_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/Point&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;satellite_end&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;Point&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_end_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/Point&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;orbit_start_end&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_start_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_end_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;orbit_direction&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_start_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_start_lon</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">sat_end_lon</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">sat_start_lon</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.1</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sat_start_lat</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="n">sat_end_lat</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">sat_start_lat</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.1</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;range_lines_start&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_start_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_start_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">near_start</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">near_start</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">far_start</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">far_start</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;range_lines_end&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">sat_end_lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">sat_end_h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">near_end</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">near_end</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">far_end</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">far_end</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/LineString&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;Placemark&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;name&gt;scene_footprint&lt;/name&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;styleUrl&gt;#scene_footprint_style&lt;/styleUrl&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;Polygon&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;outerBoundaryIs&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;          &lt;LinearRing&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;            &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="ow">in</span> <span class="n">corners</span> <span class="o">+</span> <span class="p">[</span><span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;              </span><span class="si">{</span><span class="n">lon</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">lat</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">)</span>
+    <span class="n">lines</span> <span class="o">+=</span> <span class="p">[</span>
+        <span class="s2">&quot;            &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;          &lt;/LinearRing&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;        &lt;/outerBoundaryIs&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;      &lt;/Polygon&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;    &lt;/Placemark&gt;&quot;</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">overlay_href</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">quad</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+        <span class="p">]</span>
+        <span class="n">lines</span> <span class="o">+=</span> <span class="p">[</span>
+            <span class="s2">&quot;    &lt;GroundOverlay&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;      &lt;name&gt;intensity_overlay&lt;/name&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;      &lt;Icon&gt;&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;        &lt;href&gt;</span><span class="si">{</span><span class="n">overlay_href</span><span class="si">}</span><span class="s2">&lt;/href&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;      &lt;/Icon&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;      &lt;gx:LatLonQuad&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;        &lt;coordinates&gt;&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;          </span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">quad</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2">,0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;        &lt;/coordinates&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;      &lt;/gx:LatLonQuad&gt;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;    &lt;/GroundOverlay&gt;&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="n">lines</span> <span class="o">+=</span> <span class="p">[</span>
+        <span class="s2">&quot;  &lt;/Document&gt;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;&lt;/kml&gt;&quot;</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_kml_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">corners</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Syusuke Yasui, Yutaka Yamamoto.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
