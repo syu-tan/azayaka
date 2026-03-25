@@ -25,7 +25,7 @@ Azayaka:
 """
 
 import os, gc, warnings, json, time
-from typing import Union, Tuple
+from typing import Optional, Union, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -803,7 +803,7 @@ class CEOS_PALSAR_L10_RAW(object):
         7. FFT/IFFT を用いて周波数領域と時刻領域を往復し、最終的な複素画像を返します。
 
         Args:
-            ground_velocity (float | None): 地上速度の手動指定。None の場合は推定値を使用します。
+            ground_velocity (Optional[float]): 地上速度の手動指定。None の場合は推定値を使用します。
             PATH_OUTPUT (str): ジオメトリ生成時の出力先フォルダ。
 
         Returns:
@@ -1965,6 +1965,39 @@ class CEOS_PALSAR_L11_SLC(object):
             _write_observation_json(self, output_json_path)
 
 
+def check_ceos_polarization_orbit_exists(
+    path_ceos_folder: str,
+    polarimetry: str,
+    orbit_name: str,
+) -> None:
+    """
+    Check if IMG/LED files matching the given polarization and orbit exist in the CEOS folder.
+    Raises FileNotFoundError if not found.
+
+    Args:
+        path_ceos_folder: CEOS product folder
+        polarimetry: 偏波名 'HH', 'HV', 'VV', 'VH'
+        orbit_name: 軌道名 'A' or 'D'
+
+    Raises:
+        FileNotFoundError: If the IMG/LED files matching the given polarization and orbit do not exist
+    """
+    ceos_files = os.listdir(path_ceos_folder)
+    path_led = None
+    path_img = None
+    for name in ceos_files:
+        if name.startswith("LED-") and name.endswith(f"__{orbit_name}"):
+            path_led = os.path.join(path_ceos_folder, name)
+        if name.startswith(f"IMG-{polarimetry}-") and name.endswith(f"__{orbit_name}"):
+            path_img = os.path.join(path_ceos_folder, name)
+    if path_img is None or path_led is None:
+        raise FileNotFoundError(
+            f"IMG/LED not found: PATH={path_ceos_folder}, "
+            f"POL={polarimetry}, ORBIT={orbit_name}\n"
+            "The specified orbit or polarization does not match any file in the current directory."
+        )
+
+
 class CEOS_PALSAR2_L11_SLC(object):
     """
     ALOS-2 PALSAR-2 Level 1.1 CEOS Format Reader
@@ -2649,7 +2682,7 @@ class CEOS_PALSAR2_L11_SLC(object):
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-2 PALSAR-2 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: Optional[str]=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 
@@ -3554,7 +3587,7 @@ class CEOS_PALSAR3_L11_SLC(object):
     # --------------------------------------------------------------
     # 観測ジオメトリ設定（ALOS-4 PALSAR-3 版）
     # --------------------------------------------------------------
-    def set_geometory(self, plot: bool=False, PATH_OUTPUT: str | None=None, output_json_path: str=None):
+    def set_geometory(self, plot: bool=False, PATH_OUTPUT: Optional[str]=None, output_json_path: str=None):
         """
         観測ジオメトリの設定
 

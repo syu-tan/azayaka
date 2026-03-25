@@ -726,11 +726,11 @@ class Geocode(object):
             Interpolated DEM array.
         """
         valid_points = np.where(valid_mask)
-        valid_values = dem_sparse[valid_mask]
+        valid_values = dem_sparse[valid_mask].astype(np.float32)
         if len(valid_values) == 0:
             return dem_sparse
 
-        coarse_factor = 4
+        coarse_factor = 8
         coarse_height = max(4, height // coarse_factor)
         coarse_width = max(4, width // coarse_factor)
 
@@ -748,9 +748,16 @@ class Geocode(object):
             method="cubic",
             fill_value=np.nanmean(valid_values),
         )
+        
+        del valid_points, points, grid_points, azimuth_grid, range_grid
+        gc.collect()
+        
         coarse_dem = coarse_dem_flat.reshape(coarse_height, coarse_width)
         coarse_dem = cls._fill_nan_values_simple(coarse_dem, np.nanmean(valid_values))
         coarse_dem_smooth = gaussian_filter(coarse_dem, sigma=1.0)
+        
+        del coarse_dem_flat, coarse_dem, valid_values
+        gc.collect()
 
         try:
             kx = min(3, coarse_height - 1)
@@ -761,6 +768,10 @@ class Geocode(object):
             azimuth_full = np.arange(height)
             range_full = np.arange(width)
             dem_interpolated = interp_func(azimuth_full, range_full)
+            
+            del interp_func, azimuth_full, range_full, coarse_dem_smooth, azimuth_coarse, range_coarse
+            gc.collect()
+            
         except Exception:
             dem_interpolated = cls._simple_interpolation(dem_sparse, valid_mask, height, width)
 
@@ -823,9 +834,14 @@ class Geocode(object):
         if not np.any(valid_mask):
             raise ValueError("No overlap between radar coordinates and DEM")
 
+        gc.collect()
+        
         dem_radar_smooth = cls._interpolate_with_spline_fixed(
             dem_radar_coordinate, valid_mask, num_aperture_sample, num_pixel
         )
+        
+        del dem_radar_coordinate
+        gc.collect()
 
         return dem_radar_smooth, valid_mask
 
@@ -1253,6 +1269,9 @@ class Geocode(object):
             self.sar.NUM_APERTURE_SAMPLE,
             self.sar.NUM_PIXEL,
         )
+        
+        del _
+        gc.collect()
 
         idx_az_min = int(np.min(self.idx_azimuth))
         idx_az_max = int(np.max(self.idx_azimuth))
@@ -1268,6 +1287,9 @@ class Geocode(object):
             raise ValueError("No overlap between radar coordinates and DEM after cropping")
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
+        
+        del dem_radar_smooth
+        gc.collect()
 
         po_shift_dem_range = 0.0
         po_shift_dem_azimuth = 0.0
@@ -1309,6 +1331,9 @@ class Geocode(object):
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),
                 np.zeros_like(dem_radar_smooth_cropped, dtype=np.float32),
             )
+            
+        del intensity_coarse_reg
+        gc.collect()
 
         intensity = np.abs(signal)[top_az:bot_az, left_rg:right_rg]
         if register:

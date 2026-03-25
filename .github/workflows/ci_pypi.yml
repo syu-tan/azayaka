@@ -8,11 +8,11 @@ on:
   workflow_call:
 
 jobs:
-  test-build:
+  test-build-pypi:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -27,7 +27,7 @@ jobs:
           pip install -e .
       - name: Install test tools
         run: |
-          pip install pytest build twine
+          pip install pytest build twine tomli
       - name: Run tests
         run: pytest
       - name: Build and check dist
@@ -35,6 +35,7 @@ jobs:
           python -m build
           python -m twine check dist/*
       - name: Upload dist artifacts
+        if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: dist

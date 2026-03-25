@@ -830,6 +830,10 @@ class Interferometry:
             raise ValueError("No overlap between radar coordinates and DEM after cropping")
 
         dem_radar_smooth_cropped = dem_radar_smooth[top_az:bot_az, left_rg:right_rg]
+        
+        del dem_radar_smooth
+        gc.collect()
+        
         # DEM gradient computation
         # Equation - Condition: No 1.19
         # # DEM Gradient Range := DEM_Radar(x, y+1) - DEM_Radar(x, y-1)
@@ -843,11 +847,17 @@ class Interferometry:
             20.0 * np.log10(np.clip(np.abs(signal_crop), a_min=1e-10, a_max=None)) - 10.0
         )
         
+        del signal_crop
+        gc.collect()
+        
         # Equation - Condition: No 1.18 (repeated)
         difference, _ = cv2.phaseCorrelate(
             dem_gradient_range.astype(np.float32), intensity_crop.astype(np.float32)
         )
         shift_range, shift_azimuth = difference
+        
+        del _, difference
+        gc.collect()
 
         intensity_coarse = shift(
             intensity_crop,
@@ -863,7 +873,6 @@ class Interferometry:
             stride=dem_coreg_stride,
         )
 
-        del dem_radar_smooth
         del dem_gradient_range
         del intensity_crop
         del intensity_coarse
