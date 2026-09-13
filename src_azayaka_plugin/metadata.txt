@@ -6,7 +6,7 @@
 name=Azayaka
 qgisMinimumVersion=3.0
 description=A plugin that processes Synthetic Aparture Rader data.
-version=0.1.1
+version=0.1.2
 author=Yasui Shusuke, Yutaka Yamamoto
 email=syuchimu@gmail.com, yamamo10yu1995@gmail.com
 
