@@ -575,16 +575,12 @@ class AzayakaPlugin:
             self.logger.info("Dialog created")
             # connect the signal of the OK button (overwrite the connection in the UI file)
             # disconnect all connections
-            try:
+            if self.dlg.button_box.receivers(self.dlg.button_box.accepted) > 0:
                 self.dlg.button_box.accepted.disconnect()
-            except:
-                pass
             self.dlg.button_box.accepted.connect(self._on_ok_clicked)
             # connect the signal of the rejected button
-            try:
+            if self.dlg.button_box.receivers(self.dlg.button_box.rejected) > 0:
                 self.dlg.button_box.rejected.disconnect()
-            except:
-                pass
             self.dlg.button_box.rejected.connect(self.dlg.reject)
         else:
             # update the dialog handler again
