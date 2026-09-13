@@ -42,5 +42,5 @@ Category of the plugin: Raster, Vector, Database or Web
 category=Raster
 
 # If the plugin can run on QGIS Server.
-server=True
+server=False
 
